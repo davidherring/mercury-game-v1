@@ -1,4 +1,4 @@
-# Database Schema (V1)
+# DATABASE_SCHEMA.md
 
 **Target:** Supabase-hosted PostgreSQL
 

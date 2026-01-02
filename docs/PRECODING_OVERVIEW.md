@@ -1,4 +1,4 @@
-# Mercury Negotiation Game (AI‑Integrated Web Version)
+# PRECODING_OVERVIEW.md
 
 ## 1. Purpose & Learning Goals
 
@@ -150,7 +150,6 @@ Each role includes:
 
 ### Required Pages
 
-* **Login** (Google OAuth)
 * **Role Selection**
 * **Round 1 Interface** (public statements)
 * **Round 2 Interface** (private negotiation UI)
@@ -201,7 +200,6 @@ Each role includes:
 * user_id
 * selected_role
 * state (round, issue)
-* conversation_log
 * decisions
 * outcome_summary
 
@@ -247,7 +245,7 @@ To reduce timeouts and complexity:
 
 * Frontend: React + TypeScript
 * Backend: Python + FastAPI
-* DB: MongoDB (open to Postgres if relational needs increase)
+* DB: Supabase Postgres+JSONB
 * AI: OpenAI API
 
 **AI‑Assisted Development**

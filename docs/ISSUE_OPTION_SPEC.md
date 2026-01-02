@@ -1,4 +1,4 @@
-# Issue & Option JSON Spec (V1)
+# ISSUE_OPTION_SPEC.md
 
 **Purpose:** Define the canonical, implementation-ready representation of issues and options for Round 3 voting. This spec is **agent-facing** (for gameplay logic and prompting), not player-facing pedagogy.
 

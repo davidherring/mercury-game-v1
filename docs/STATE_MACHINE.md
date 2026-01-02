@@ -1,4 +1,4 @@
-# State Machine Spec (V1)
+# STATE_MACHINE.md
 
 **Purpose:** Define a deterministic, save/resume-safe state machine for the Mercury negotiation simulation (web version). This document is the canonical source of game flow rules.
 
@@ -15,7 +15,7 @@
 
 * Full AI–AI private negotiation simulation coverage
 * Instructor/admin class management
-* OAuth requirement (can be added later)
+* OAuth requirement (will be added later)
 * Perfect realism of real-world negotiation timing/structure
 
 ---
@@ -56,7 +56,7 @@ Each phase is a deterministic state with allowed events and side effects.
 
 ## 3) Core State Shape (Conceptual)
 
-> Implementation can use Postgres+JSONB or Mongo; this spec assumes a single authoritative `game_state` object persisted and checkpointed.
+> Implementation will use Postgres+JSONB; this spec assumes a single authoritative `game_state` object persisted and checkpointed.
 
 ### Required state fields
 
@@ -77,7 +77,10 @@ Each phase is a deterministic state with allowed events and side effects.
   * `ai_ai_background_outcomes`: optional list of stance updates applied (v1 may be rules-only)
 * `round3`
 
-  * `issues[]`: 4 issues, each with options
+  * round3
+    * issues: ["1","2","3","4"] (issue IDs only; definitions/options live in issue_definitions / ISSUE_OPTION_SPEC)
+    * active_issue_index
+    * active_issue_state (debate round, speaker cursor, etc.)
   * `active_issue_index`
   * `active_issue_state` (debate round, speaker cursor, etc.)
 * `stances`
@@ -184,6 +187,7 @@ Each phase is a deterministic state with allowed events and side effects.
 * Initialize base `stances` from Top Secret docs + selected opening variant bundle
 * Precompute Round 1 constraints and generate `speaker_order`
 * Assign Round 1 opening statement variants for all roles (no AI calls)
+* Generate round1.speaker_order with constraint: human does not speak first within its subgroup (countries or NGOs).
 
 **Guards**
 
@@ -205,7 +209,7 @@ Each phase is a deterministic state with allowed events and side effects.
 
   * `round1.speaker_order`
   * `round1.openings` (variant id + text per role)
-* Append transcript entries for Japan’s introductory framing (scripted)
+  * Append transcript entries for Japan’s introductory framing (scripted)
 
 **Transitions**
 
@@ -362,7 +366,8 @@ Each phase is a deterministic state with allowed events and side effects.
 
 **Entry actions**
 
-* Load the 4 issues + options (from GeneralInstructions)
+* Load issue IDs into game_state.round3.issues (["1","2","3","4"])
+* Issue definitions/options are retrieved from issue_definitions (or ISSUE_OPTION_SPEC) when rendering/prompts are built (not stored in game_state)
 * Initialize `active_issue_index = 0`
 * Initialize issue state for debate
 * Create checkpoint
@@ -385,7 +390,7 @@ Each phase is a deterministic state with allowed events and side effects.
 
   * countries first, then NGOs
   * human placement options: first | random | skip
-* Persist debate order and human choice
+  * Persist debate order and human choice
 
 **Transitions**
 

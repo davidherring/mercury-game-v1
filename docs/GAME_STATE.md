@@ -1,4 +1,4 @@
-# Example `game_state` JSON (Annotated, V1)
+# GAME_STATE.md
 
 **Purpose:** This document defines a **concrete, implementation-ready example** of the `game_state` object. It exists to:
 
