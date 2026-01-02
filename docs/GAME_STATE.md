@@ -50,17 +50,17 @@ This is **not a proposal** or a flexible sketch. It is a **reference shape** tha
 
   "round1": {
     "speaker_order": ["CAN", "CHN", "USA", "BRA", "EU", "TZA", "AMAP", "MFF", "WCPA"],
-    "opening_variants": {
-      "USA": "usa_opening_v2",
-      "BRA": "bra_opening_v1",
-      "CHN": "chn_opening_v3",
-      "EU":  "eu_opening_v1",
-      "CAN": "can_opening_v2",
-      "TZA": "tza_opening_v1",
-      "AMAP": "amap_opening_v1",
-      "MFF":  "mff_opening_v2",
-      "WCPA": "wcpa_opening_v1"
-    },
+    "openings": {
+        "USA": { "variant_id": "usa_opening_v2", "text": "<opening text here>" },
+        "BRA": { "variant_id": "bra_opening_v1", "text": "<opening text here>" },
+        "CHN": { "variant_id": "chn_opening_v3", "text": "<opening text here>" },
+        "EU":  { "variant_id": "eu_opening_v1",  "text": "<opening text here>" },
+        "CAN": { "variant_id": "can_opening_v2", "text": "<opening text here>" },
+        "TZA": { "variant_id": "tza_opening_v1", "text": "<opening text here>" },
+        "AMAP": { "variant_id": "amap_opening_v1", "text": "<opening text here>" },
+        "MFF":  { "variant_id": "mff_opening_v2",  "text": "<opening text here>" },
+        "WCPA": { "variant_id": "wcpa_opening_v1", "text": "<opening text here>" }
+    }
     "cursor": 9
   },
 

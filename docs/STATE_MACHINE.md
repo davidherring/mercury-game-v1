@@ -69,8 +69,7 @@ Each phase is a deterministic state with allowed events and side effects.
   * includes: id, type (country|ngo|chair), displayName
 * `round1`
 
-  * `speaker_order`: ordered list (countries first group, NGOs after), randomized with constraints
-    * Constraint: the human does not speak first within its subgroup (countries or NGOs).
+  * speaker_order: ordered list (countries first, then NGOs), randomized; the human must not be first within its subgroup (countries or NGOs).
   * `openings`: map roleId → openingVariantId + openingText
 * `round2`
 
