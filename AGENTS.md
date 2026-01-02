@@ -55,7 +55,7 @@ If an AI message is streaming and fails mid-generation:
   * Do not write partial text to transcript_entries.
   * Resume returns to the last completed checkpoint.
   * The next action is to re-attempt generation for the same turn using the same stored prompt inputs (role_id, state snapshot, transcript pointer).
-  * Record an internal error log entry (no transcript entry) indicating a retry occurred.
+  * Emit an error log event using the standard logging protocol (see 7.1).
 
 ---
 
@@ -104,7 +104,9 @@ Japan intervenes only to enforce structure:
 * Enforces speaking order and “speak or skip” limits.
 * Does not intervene for rhetoric quality, persuasion, or substance.
 * Round 3: Japan does not “timeout” speakers; the UI enforces turn completion.
-* If an AI response fails/returns empty, Japan issues a neutral procedural line and the system treats the turn as SKIPPED (see 2.2 / resume & failures).
+* If an AI response fails/returns empty, Japan emits the appropriate procedural line from the Japan script library and the system treats the turn as SKIPPED.
+  * Japan’s procedural lines live in a separate file/spec (e.g., `JAPAN_SCRIPTS.md` or a DB table). AGENTS.md only defines *when* Japan speaks, not the full text.
+  * A skipped turn advances the cursor and counts as that role’s opportunity to speak for that slot.
 
 
 ---
@@ -120,9 +122,11 @@ Japan intervenes only to enforce structure:
 
 ### 4.1.1 Opening variant selection (deterministic)
 
-Round 1 openings are selected deterministically:
-* For each role, choose opening variant by (seed + role_id) using a stable mapping.
-* Persist both variant_id and opening_text into game_state.round1.openings at ROUND_1_SETUP.
+Round 1 openings are selected deterministically from the DB:
+* Source of truth: `opening_variants` rows filtered by `role_id`.
+* Selection: use a seeded RNG derived from `game.seed` to pick one row per role.
+* To make the selection stable across DB ordering changes, sort candidates by a stable key (e.g., `opening_variants.id ASC`) before indexing.
+* Persist both `variant_id` and `opening_text` into `game_state.round1.openings` at `ROUND_1_SETUP`.
 * No live model calls for Round 1.
 
 ---
@@ -245,6 +249,10 @@ Every state transition must log:
   * checkpoint_id created (if any)
 
 Prefer structured JSON logs.
+
+Destination: backend application logs (stdout) as structured JSON. (Persisting logs to DB is optional and out of scope for V1 unless explicitly added.)
+  * Example: { "type":"transition", "game_id":"...", "from":"ROUND_2_SETUP", "to":"ROUND_2_SELECT_CONVO_1", "event":"ROUND_2_READY", "actor":"SYSTEM", "checkpoint_id":"cp_..." }
+
 
 ---
 
