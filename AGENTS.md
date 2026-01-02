@@ -55,7 +55,7 @@ If an AI message is streaming and fails mid-generation:
   * Do not write partial text to transcript_entries.
   * Resume returns to the last completed checkpoint.
   * The next action is to re-attempt generation for the same turn using the same stored prompt inputs (role_id, state snapshot, transcript pointer).
-  * Emit an error log event using the standard logging protocol (see 7.1).
+  * Emit an error log event using the standard logging protocol (see 7.2).
 
 ---
 
@@ -82,7 +82,7 @@ AI representatives:
   * visible to the human player
   * not visible to other AI roles except the agents who were directly involved in the conversations
 * AI roles must not reference private conversations they were not part of.
-* The IMA Assessment may be referenced **only through approved excerpts**.
+* The IMA Assessment may be referenced **only through approved excerpts** listed in the ima_excerpts DB table.
 
 ---
 
@@ -105,7 +105,7 @@ Japan intervenes only to enforce structure:
 * Does not intervene for rhetoric quality, persuasion, or substance.
 * Round 3: Japan does not “timeout” speakers; the UI enforces turn completion.
 * If an AI response fails/returns empty, Japan emits the appropriate procedural line from the Japan script library and the system treats the turn as SKIPPED.
-  * Japan’s procedural lines live in a separate file/spec (e.g., `JAPAN_SCRIPTS.md` or a DB table). AGENTS.md only defines *when* Japan speaks, not the full text.
+  * Japan’s procedural lines live in the DB table. AGENTS.md only defines *when* Japan speaks, not the full text.
   * A skipped turn advances the cursor and counts as that role’s opportunity to speak for that slot.
 
 
@@ -253,6 +253,19 @@ Prefer structured JSON logs.
 Destination: backend application logs (stdout) as structured JSON. (Persisting logs to DB is optional and out of scope for V1 unless explicitly added.)
   * Example: { "type":"transition", "game_id":"...", "from":"ROUND_2_SETUP", "to":"ROUND_2_SELECT_CONVO_1", "event":"ROUND_2_READY", "actor":"SYSTEM", "checkpoint_id":"cp_..." }
 
+
+---
+### 7.2 Required error logging (V1)
+
+Required fields:
+  * type: "error"
+  * game_id
+  * status
+  * actor_role_id (or SYSTEM)
+  * error_code (e.g., AI_EMPTY, AI_STREAM_FAIL, AI_TIMEOUT)
+  * attempt (int)
+  * checkpoint_id (the last safe checkpoint you rolled back to)
+  * optional: round, issue_id
 
 ---
 

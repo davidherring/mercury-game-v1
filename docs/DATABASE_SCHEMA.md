@@ -253,6 +253,50 @@ CREATE TABLE votes (
 
 ---
 
+## 11. Japan procedural script lines (templated, keyed)
+
+```sql
+CREATE TABLE japan_scripts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  script_key TEXT NOT NULL UNIQUE,              -- e.g. 'R2_INTERRUPT', 'ISSUE_INTRO', 'VOTE_RESULT_PASS'
+  state TEXT,                                   -- optional: STATE_MACHINE status where used
+  template TEXT NOT NULL,                        -- the actual line (can include {placeholders})
+  metadata JSONB,                                -- optional: { "placeholders": ["speaker","issue_id"] }
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+Sample starter set:
+```sql
+INSERT INTO japan_scripts (script_key, state, template) VALUES
+('R1_OPEN', 'ROUND_1_OPENING_STATEMENTS', 'The Chair calls the meeting to order. We will begin opening statements.'),
+('R1_CALL_SPEAKER', 'ROUND_1_OPENING_STATEMENTS', 'I recognize {speaker}.'),
+('R2_INTERRUPT', 'ROUND_2_CONVERSATION_ACTIVE', 'The Chair interrupts. Please move to final statements.'),
+('ISSUE_INTRO', 'ISSUE_INTRO', 'We now consider Issue {issue_id}: {issue_title}. The options are: {options_list}.'),
+('PROPOSAL', 'ISSUE_PROPOSAL_SELECTION', 'The Chair proposes option {option_id} for adoption.'),
+('VOTE_RESULT_PASS', 'ISSUE_VOTE', 'The proposal is adopted by unanimous consent.'),
+('VOTE_RESULT_FAIL', 'ISSUE_VOTE', 'The proposal is not adopted (unanimity was not achieved).');
+```
+
+---
+
+## 12. Approved IMA excerpts (the ONLY allowed IMA text source)
+
+```sql
+CREATE TABLE ima_excerpts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  excerpt_key TEXT NOT NULL UNIQUE,              -- e.g. 'IMA_ATMOS_TRANSPORT', 'IMA_HEALTH_IMPACTS'
+  content TEXT NOT NULL,                         -- the approved excerpt text
+  source_ref TEXT,                               -- optional: "IMA p.12", section name, etc.
+  tags TEXT[],                                   -- optional: ARRAY['round2','round3','atmospheric']
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+
+---
+
 ## 11. Performance & cost considerations (Supabase free tier)
 
 * Game state reads: **1 row per resume**
