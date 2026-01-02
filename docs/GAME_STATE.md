@@ -60,7 +60,7 @@ This is **not a proposal** or a flexible sketch. It is a **reference shape** tha
         "AMAP": { "variant_id": "amap_opening_v1", "text": "<opening text here>" },
         "MFF":  { "variant_id": "mff_opening_v2",  "text": "<opening text here>" },
         "WCPA": { "variant_id": "wcpa_opening_v1", "text": "<opening text here>" }
-    }
+    },
     "cursor": 9
   },
 

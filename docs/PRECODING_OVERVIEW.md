@@ -26,7 +26,6 @@ This version replaces human counterparts with AI agents while keeping one human 
 
 * 1 Human player (selects a role)
 * 9 AI agents
-
   * Countries: Brazil (GRULAC), Canada, China, EU, Tanzania (Africa Group), USA
   * NGOs: AMAP, MFF, WCPA
   * Chair/Moderator: Japan
@@ -79,19 +78,16 @@ This version replaces human counterparts with AI agents while keeping one human 
 * In a private conversation, the human can go first or let the counterpart start.
 * Japan enforces a basic cap: interrupt after **5 comments each** (human + agent), then allow **1 final comment each** to finalize plans.
 * AI–AI private negotiations occur separately; prebuilt/snippet-based conversations may be used to reduce API calls.
-
   * If the human selects a given AI representative, that AI conducts only **one** additional AI–AI conversation.
 
 ### Round 3 – Debate & voting loop
 
 * Four issues are handled **sequentially**.
 * Each issue has **two discussion rounds**.
-
   * In each discussion round, each representative may speak at most once (or skip).
   * Therefore any representative may speak at most **twice** per issue.
 * NGOs follow the same speaking limits and may speak **only after countries**.
 * For Round 3 speaker order:
-
   * The order for the first discussion round is shown on screen.
   * The human may choose: go first, be inserted randomly, or skip their turn.
   * The process repeats for the second discussion round, then the vote.
@@ -179,13 +175,11 @@ Each role includes:
 To reduce timeouts and complexity:
 
 * Use **one primary LLM “role actor”** that is re-prompted per speaking turn with:
-
   * The role’s private instructions
   * Shared game rules and constraints
   * The current round + issue
   * The current public transcript + relevant private negotiation context
 * Optionally use **one secondary summarizer** behind the scenes to maintain a compact running summary.
-
   * Summaries should be structured (e.g., positions, concessions, threats, promises, and open questions).
 
 ### Performance / reliability constraints
@@ -193,7 +187,6 @@ To reduce timeouts and complexity:
 * Round 1 should run **without live model calls** (use curated opening statements) to allow background warm-up and reduce early latency.
 * Japan (Chair) can be **largely automated** via templated moderation actions and timing gates.
 * Prevent timeouts by:
-
   * Early initialization / warm-up
   * Bounded prompt sizes
   * Streaming responses to the UI

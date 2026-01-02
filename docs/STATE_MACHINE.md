@@ -64,35 +64,27 @@ Each phase is a deterministic state with allowed events and side effects.
 * `created_at`, `updated_at`
 * `status`: one of the phase/state ids defined below
 * `human_role_id`
-* `roles[]`: all roles in the session (10 total including chair)
-
-  * includes: id, type (country|ngo|chair), displayName
+* roles: map roleId → { type } (minimal metadata only; display_name and role_type come from the roles table)
 * `round1`
-
   * speaker_order: ordered list (countries first, then NGOs), randomized; the human must not be first within its subgroup (countries or NGOs).
   * `openings`: map roleId → openingVariantId + openingText
 * `round2`
-
   * `human_conversations`: ordered list of conversations (1 required, 2nd optional)
   * `ai_ai_background_outcomes`: optional list of stance updates applied (v1 may be rules-only)
 * `round3`
-
   * round3
     * issues: ["1","2","3","4"] (issue IDs only; definitions/options live in issue_definitions / ISSUE_OPTION_SPEC)
     * Issue definitions/options live in issue_definitions / ISSUE_OPTION_SPEC (not stored inside game_state)
     * active_issue_index
-    * active_issue_state (debate round, speaker cursor, etc.)
+    * active_issue (debate round, speaker cursor, etc.)
   * `active_issue_index`
-  * `active_issue_state` (debate round, speaker cursor, etc.)
+  * `active_issue` (debate round, speaker cursor, etc.)
 * `stances`
-
   * per-role stance for each issue (preferred option, acceptability, conditions)
   * updated incrementally
 * `votes[]`
-
   * per issue: proposalOptionId, per-country votes, result
 * `checkpoints[]`
-
   * list of checkpoint ids with pointers to transcript_entry_id and game_state snapshot metadata
 
 ### Determinism requirements
@@ -112,7 +104,6 @@ Each phase is a deterministic state with allowed events and side effects.
 ### Checkpoint policy
 
 * Create a checkpoint after:
-
   * role selection finalized
   * Round 1 speaker order + openings assigned
   * each Round 2 message (human or AI) committed
@@ -122,7 +113,6 @@ Each phase is a deterministic state with allowed events and side effects.
 ### Resume policy
 
 * On resume, the UI loads:
-
   * current `status`
   * transcript entries up to `checkpoints.transcript_entry_id` (or by created_at <= checkpoint time)
   * current cursors (speaker cursor, debate round, conversation cursor)
@@ -207,7 +197,6 @@ Each phase is a deterministic state with allowed events and side effects.
 **Entry actions**
 
 * Persist:
-
   * `round1.speaker_order`
   * `round1.openings` (variant id + text per role)
   * Append transcript entries for Japan’s introductory framing (scripted)
@@ -241,7 +230,6 @@ Each phase is a deterministic state with allowed events and side effects.
 **Completion**
 
 * When cursor reaches end:
-
   * set `status = ROUND_2_SETUP`
 
 **Transitions**
@@ -313,14 +301,12 @@ Each phase is a deterministic state with allowed events and side effects.
 **Interrupt trigger**
 
 * When `human_turns_used == 5` and `partner_turns_used == 5`:
-
   * append Japan interrupt (scripted)
   * set phase `FINAL_TURNS`
 
 **Close trigger**
 
 * After each has produced one final message:
-
   * append Japan close (optional)
   * mark convo closed
 
@@ -391,7 +377,7 @@ Each phase is a deterministic state with allowed events and side effects.
 * Determine discussion order for Debate Round 1
   * countries first, then NGOs
   * human placement options: first | random | skip
-  * Persist debate order and human choice
+* Persist debate order and human choice
 
 **Transitions**
 
@@ -454,7 +440,6 @@ Same as Round 1, with a separate stored order `debate_order_round2`.
 **Entry actions**
 
 * Ensure each role has a current `issue_preference` selected (option id)
-
   * If a role did not speak, retain previous preference unless a rule update changed it
   * If the last speaker’s stance update is pending, apply it now
 
@@ -513,7 +498,6 @@ Same as Round 1, with a separate stored order `debate_order_round2`.
 * Persist votes as they come in
 * Append transcript entries (public): vote announcements
 * When all 6 votes recorded:
-
   * compute result
   * append Japan result announcement
   * persist vote record for the issue
@@ -543,10 +527,8 @@ Same as Round 1, with a separate stored order `debate_order_round2`.
 **Transitions**
 
 * If `active_issue_index < 3`:
-
   * `ISSUE_RESOLUTION → ISSUE_INTRO` on `NEXT_ISSUE`
 * Else:
-
   * `ISSUE_RESOLUTION → ROUND_3_COMPLETE` on `ALL_ISSUES_RESOLVED`
 
 ---
@@ -597,10 +579,9 @@ Same as Round 1, with a separate stored order `debate_order_round2`.
 
 * Round 1 and Round 3 entries are **public**.
 * Round 2 human conversations are **private**:
-
   * visible to the human in Review
   * visible to the human during later rounds via modal
-  * NOT visible to other roles
+  * NOT visible to other roles except the agents directly involved in the conversations
 
 ---
 
