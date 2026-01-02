@@ -164,48 +164,7 @@ Each role includes:
 
 ---
 
-## 6. Data Model (Draft)
-
-### users
-
-* id
-* name
-* email
-* role (student | instructor | admin)
-* classes[]
-
-### roles
-
-* id
-* country_or_org
-* public_summary
-* private_instructions
-* personality_traits
-
-### opening_statements
-
-* role_id
-* text
-* tone
-
-### negotiation_snippets (optional optimization)
-
-* participants[]
-* scenario_tags
-* dialogue
-
-### game_records
-
-* id
-* user_id
-* selected_role
-* state (round, issue)
-* decisions
-* outcome_summary
-
----
-
-## 7. AI Architecture (Initial, Non-MCP)
+## 6. AI Architecture (Initial, Non-MCP)
 
 ### Key behavioral requirements
 
@@ -239,7 +198,7 @@ To reduce timeouts and complexity:
   * Bounded prompt sizes
   * Streaming responses to the UI
 
-## 8. Tooling & Workflow
+## 7. Tooling & Workflow
 
 **Stack**
 
@@ -256,7 +215,7 @@ To reduce timeouts and complexity:
 
 ---
 
-## 9. Explicit Non‑Goals (for v1)
+## 8. Explicit Non‑Goals (for v1)
 
 * Real‑time multiplayer
 * MCP server

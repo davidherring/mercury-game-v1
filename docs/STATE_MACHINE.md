@@ -70,6 +70,7 @@ Each phase is a deterministic state with allowed events and side effects.
 * `round1`
 
   * `speaker_order`: ordered list (countries first group, NGOs after), randomized with constraints
+    * Constraint: the human does not speak first within its subgroup (countries or NGOs).
   * `openings`: map roleId → openingVariantId + openingText
 * `round2`
 
@@ -79,6 +80,7 @@ Each phase is a deterministic state with allowed events and side effects.
 
   * round3
     * issues: ["1","2","3","4"] (issue IDs only; definitions/options live in issue_definitions / ISSUE_OPTION_SPEC)
+    * Issue definitions/options live in issue_definitions / ISSUE_OPTION_SPEC (not stored inside game_state)
     * active_issue_index
     * active_issue_state (debate round, speaker cursor, etc.)
   * `active_issue_index`
@@ -185,9 +187,9 @@ Each phase is a deterministic state with allowed events and side effects.
 * Persist `human_role_id`
 * Initialize `seed` (if not present)
 * Initialize base `stances` from Top Secret docs + selected opening variant bundle
-* Precompute Round 1 constraints and generate `speaker_order`
-* Assign Round 1 opening statement variants for all roles (no AI calls)
 * Generate round1.speaker_order with constraint: human does not speak first within its subgroup (countries or NGOs).
+* Assign Round 1 opening statement variants for all roles (no AI calls)
+
 
 **Guards**
 
@@ -367,7 +369,7 @@ Each phase is a deterministic state with allowed events and side effects.
 **Entry actions**
 
 * Load issue IDs into game_state.round3.issues (["1","2","3","4"])
-* Issue definitions/options are retrieved from issue_definitions (or ISSUE_OPTION_SPEC) when rendering/prompts are built (not stored in game_state)
+* Retrieve issue definitions/options from issue_definitions (or ISSUE_OPTION_SPEC) when rendering UI and building prompts (do not store full option text in game_state)
 * Initialize `active_issue_index = 0`
 * Initialize issue state for debate
 * Create checkpoint
@@ -384,10 +386,10 @@ Each phase is a deterministic state with allowed events and side effects.
 
 **Entry actions**
 
+* Fetch issue definition by issue_id to display fixed options and build prompts
 * Japan announces the issue and lists all fixed options
 * UI enables “Issue modal” (pre-vote: shows issue + options)
 * Determine discussion order for Debate Round 1
-
   * countries first, then NGOs
   * human placement options: first | random | skip
   * Persist debate order and human choice
