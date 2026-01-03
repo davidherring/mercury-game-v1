@@ -445,7 +445,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             await persist_state(session, game_id, next_status, state, speaker_transcript_id)
             return {"game_id": game_id, "state": state}
 
-        # ---- Round 2 setup and partner selection scaffolding ----
+        # ---- Round 2 setup, partner selection, conversations, wrap-up ----
         if event == "ROUND_2_READY":
             if current_status != "ROUND_2_SETUP":
                 raise HTTPException(status_code=400, detail="ROUND_2_READY only allowed from ROUND_2_SETUP")
@@ -497,14 +497,16 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, transcript_id)
             return {"game_id": game_id, "state": state}
 
-        if event == "CONVO_1_MESSAGE":
+        if event in ("CONVO_1_MESSAGE", "CONVO_2_MESSAGE", "CONVO_MESSAGE"):
             if current_status != "ROUND_2_CONVERSATION_ACTIVE":
-                raise HTTPException(status_code=400, detail="CONVO_1_MESSAGE only allowed in ROUND_2_CONVERSATION_ACTIVE")
+                raise HTTPException(status_code=400, detail="CONVO_MESSAGE only allowed in ROUND_2_CONVERSATION_ACTIVE")
             content = req.payload.get("content")
             if not content:
                 raise HTTPException(status_code=400, detail="content required")
             round2 = state.setdefault("round2", {})
-            convo = round2.get("convo1")
+            active_idx = round2.get("active_convo_index") or 1
+            convo_key = f"convo{active_idx}"
+            convo = round2.get(convo_key)
             if not convo or convo.get("status") == "CLOSED":
                 raise HTTPException(status_code=400, detail="Conversation is closed")
             human_role_id = state.get("human_role_id")
@@ -525,7 +527,6 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 if human_turns >= 5:
                     raise HTTPException(status_code=400, detail="No human turns remaining")
 
-            # Human message
             human_tid = await insert_transcript_entry(
                 session,
                 game_id,
@@ -534,14 +535,13 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 content=content,
                 visible_to_human=True,
                 round_number=2,
-                metadata={"partner": partner, "sender": "human", "index": human_turns},
+                metadata={"partner": partner, "sender": "human", "index": human_turns, "convo": convo_key},
             )
             convo["human_turns_used"] = human_turns + 1
             if post_interrupt:
                 convo["final_human_sent"] = True
             await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, human_tid)
 
-            # AI reply (deterministic stub)
             reply = await get_ai_responder().respond(content)
             ai_tid = await insert_transcript_entry(
                 session,
@@ -551,14 +551,13 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 content=reply,
                 visible_to_human=True,
                 round_number=2,
-                metadata={"partner": human_role_id, "sender": "ai", "index": ai_turns},
+                metadata={"partner": human_role_id, "sender": "ai", "index": ai_turns, "convo": convo_key},
             )
             convo["ai_turns_used"] = ai_turns + 1
             if post_interrupt:
                 convo["final_ai_sent"] = True
 
             next_status = "ROUND_2_CONVERSATION_ACTIVE"
-            # Interrupt trigger after 5 exchanges
             interrupt_tid = None
             if not post_interrupt and convo["human_turns_used"] >= 5 and convo["ai_turns_used"] >= 5:
                 interrupt_tid = await insert_transcript_entry(
@@ -569,23 +568,106 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                     content="The Chair interrupts. Please move to final statements.",
                     visible_to_human=True,
                     round_number=2,
-                    metadata={"interrupt": True},
+                    metadata={"interrupt": True, "convo": convo_key},
                 )
                 convo["post_interrupt"] = True
                 convo["phase"] = "POST_INTERRUPT"
 
-            # Closure after final exchange
             if convo.get("post_interrupt") and convo.get("final_human_sent") and convo.get("final_ai_sent"):
                 convo["status"] = "CLOSED"
                 convo["phase"] = "CLOSED"
                 round2["active_convo_index"] = None
-                next_status = "ROUND_2_SELECT_CONVO_2"
+                if active_idx == 1:
+                    next_status = "ROUND_2_SELECT_CONVO_2"
+                else:
+                    next_status = "ROUND_2_WRAP_UP"
 
             await persist_state(session, game_id, next_status, state, ai_tid)
 
             if interrupt_tid:
                 await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, interrupt_tid)
 
+            if next_status == "ROUND_2_WRAP_UP":
+                wrap_tid = await insert_transcript_entry(
+                    session,
+                    game_id,
+                    role_id=CHAIR,
+                    phase="ROUND_2",
+                    content="Private negotiations concluded. Preparing to move to Round 3.",
+                    visible_to_human=True,
+                    round_number=2,
+                )
+                await persist_state(session, game_id, "ROUND_2_WRAP_UP", state, wrap_tid)
+
+            return {"game_id": game_id, "state": state}
+
+        if event == "CONVO_2_SELECTED":
+            if current_status != "ROUND_2_SELECT_CONVO_2":
+                raise HTTPException(status_code=400, detail="CONVO_2_SELECTED only allowed from ROUND_2_SELECT_CONVO_2")
+            partner = req.payload.get("partner_role_id")
+            if not partner:
+                raise HTTPException(status_code=400, detail="partner_role_id required")
+            if partner == state.get("human_role_id") or partner == CHAIR:
+                raise HTTPException(status_code=400, detail="Invalid partner_role_id")
+            convo1_partner = state.get("round2", {}).get("convo1", {}).get("partner_role")
+            if partner == convo1_partner:
+                raise HTTPException(status_code=400, detail="partner_role_id already used")
+            if partner not in state.get("roles", {}):
+                raise HTTPException(status_code=400, detail="Unknown partner_role_id")
+
+            state.setdefault("round2", {})
+            state["round2"]["active_convo_index"] = 2
+            state["round2"]["convo2"] = {
+                "partner_role": partner,
+                "status": "ACTIVE",
+                "human_turns_used": 0,
+                "ai_turns_used": 0,
+                "phase": "OPEN",
+            }
+
+            transcript_id = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=CHAIR,
+                phase="ROUND_2",
+                content=f"Second private negotiation started with {partner}.",
+                visible_to_human=True,
+                round_number=2,
+                metadata={"partner": partner},
+            )
+            await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, transcript_id)
+            return {"game_id": game_id, "state": state}
+
+        if event == "CONVO_2_SKIPPED":
+            if current_status != "ROUND_2_SELECT_CONVO_2":
+                raise HTTPException(status_code=400, detail="CONVO_2_SKIPPED only allowed from ROUND_2_SELECT_CONVO_2")
+            state.setdefault("round2", {})
+            state["round2"]["active_convo_index"] = None
+            transcript_id = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=CHAIR,
+                phase="ROUND_2",
+                content="Second private negotiation skipped.",
+                visible_to_human=True,
+                round_number=2,
+            )
+            await persist_state(session, game_id, "ROUND_2_WRAP_UP", state, transcript_id)
+            return {"game_id": game_id, "state": state}
+
+        if event == "ROUND_2_WRAP_READY":
+            if current_status != "ROUND_2_WRAP_UP":
+                raise HTTPException(status_code=400, detail="ROUND_2_WRAP_READY only allowed from ROUND_2_WRAP_UP")
+            transcript_id = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=CHAIR,
+                phase="ROUND_2",
+                content="Round 2 complete. Moving to Round 3 setup.",
+                visible_to_human=True,
+                round_number=2,
+            )
+            await persist_state(session, game_id, "ROUND_3_SETUP", state, transcript_id)
             return {"game_id": game_id, "state": state}
 
         raise HTTPException(status_code=400, detail="Unsupported event")
