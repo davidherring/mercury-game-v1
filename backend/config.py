@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str = Field(..., alias="DATABASE_URL")
+    database_url: str = Field(..., alias="SUPABASE_DATABASE_URL")
     app_env: str = Field(default="local", alias="APP_ENV")
 
     class Config:
