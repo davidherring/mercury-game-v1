@@ -52,6 +52,21 @@ async def test_deterministic_speaker_order_and_openings():
         openings2 = g2["state"]["round1"]["openings"]
         assert openings1 == openings2
 
+        # Sanity: selected variant ids exist for each role
+        by_role: dict[str, set[str]] = {}
+        async for session in get_session():
+            assert isinstance(session, AsyncSession)
+            async with session.begin():
+                res = await session.execute(text("SELECT role_id, id FROM opening_variants"))
+                rows = res.mappings().all()
+                for r in rows:
+                    by_role.setdefault(r["role_id"], set()).add(str(r["id"]))
+            break
+        for role_id, opening in openings1.items():
+            if role_id == "JPN":
+                continue
+            assert opening["variant_id"] in by_role.get(role_id, set())
+
         # First step transcript should match opening text for first speaker
         first_speaker = order1[0]
         step1 = await client.post(f"/games/{g1['id']}/advance", json={"event": "ROUND_1_STEP", "payload": {}})

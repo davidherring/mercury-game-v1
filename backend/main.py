@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .ai import FakeLLM, AIResponder
 from .db import get_session
 from .state import (
     COUNTRIES,
@@ -181,6 +182,15 @@ def render_script(template: Optional[str], **kwargs: Any) -> str:
         return template.format(**kwargs)
     except Exception:
         return template
+
+
+def get_ai_responder() -> AIResponder:
+    responder = getattr(app.state, "ai_responder", None)
+    if responder:
+        return responder
+    if not hasattr(app.state, "_default_ai_responder"):
+        app.state._default_ai_responder = FakeLLM()
+    return app.state._default_ai_responder
 
 
 @app.get("/health")
@@ -369,7 +379,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 )
 
             openings: Dict[str, Dict[str, Any]] = {}
-            for role_id in state.get("roles", {}):
+            for role_id in sorted(state.get("roles", {})):
                 if role_id == CHAIR:
                     continue
                 chosen = pick_opening_variant(role_id, seed, openings_by_role.get(role_id, []))
@@ -433,6 +443,149 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 next_status = "ROUND_2_SETUP"
             state["round1"] = round1
             await persist_state(session, game_id, next_status, state, speaker_transcript_id)
+            return {"game_id": game_id, "state": state}
+
+        # ---- Round 2 setup and partner selection scaffolding ----
+        if event == "ROUND_2_READY":
+            if current_status != "ROUND_2_SETUP":
+                raise HTTPException(status_code=400, detail="ROUND_2_READY only allowed from ROUND_2_SETUP")
+            transcript_id = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=CHAIR,
+                phase="ROUND_2",
+                content="Entering private negotiations (Round 2 setup).",
+                visible_to_human=True,
+                round_number=2,
+            )
+            state.setdefault("round2", {})
+            state["round2"]["active_convo_index"] = None
+            await persist_state(session, game_id, "ROUND_2_SELECT_CONVO_1", state, transcript_id)
+            return {"game_id": game_id, "state": state}
+
+        if event == "CONVO_1_SELECTED":
+            if current_status != "ROUND_2_SELECT_CONVO_1":
+                raise HTTPException(status_code=400, detail="CONVO_1_SELECTED only allowed from ROUND_2_SELECT_CONVO_1")
+            partner = req.payload.get("partner_role_id")
+            if not partner:
+                raise HTTPException(status_code=400, detail="partner_role_id required")
+            if partner == state.get("human_role_id") or partner == CHAIR:
+                raise HTTPException(status_code=400, detail="Invalid partner_role_id")
+            if partner not in state.get("roles", {}):
+                raise HTTPException(status_code=400, detail="Unknown partner_role_id")
+
+            state.setdefault("round2", {})
+            state["round2"]["active_convo_index"] = 1
+            state["round2"]["convo1"] = {
+                "partner_role": partner,
+                "status": "ACTIVE",
+                "human_turns_used": 0,
+                "ai_turns_used": 0,
+                "phase": "OPEN",
+            }
+
+            transcript_id = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=CHAIR,
+                phase="ROUND_2",
+                content=f"Private negotiation started with {partner}.",
+                visible_to_human=True,
+                round_number=2,
+                metadata={"partner": partner},
+            )
+            await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, transcript_id)
+            return {"game_id": game_id, "state": state}
+
+        if event == "CONVO_1_MESSAGE":
+            if current_status != "ROUND_2_CONVERSATION_ACTIVE":
+                raise HTTPException(status_code=400, detail="CONVO_1_MESSAGE only allowed in ROUND_2_CONVERSATION_ACTIVE")
+            content = req.payload.get("content")
+            if not content:
+                raise HTTPException(status_code=400, detail="content required")
+            round2 = state.setdefault("round2", {})
+            convo = round2.get("convo1")
+            if not convo or convo.get("status") == "CLOSED":
+                raise HTTPException(status_code=400, detail="Conversation is closed")
+            human_role_id = state.get("human_role_id")
+            partner = convo.get("partner_role")
+            if not human_role_id or not partner:
+                raise HTTPException(status_code=400, detail="Conversation not initialized")
+
+            post_interrupt = bool(convo.get("post_interrupt"))
+            final_human = bool(convo.get("final_human_sent"))
+            final_ai = bool(convo.get("final_ai_sent"))
+            human_turns = int(convo.get("human_turns_used", 0))
+            ai_turns = int(convo.get("ai_turns_used", 0))
+
+            if post_interrupt:
+                if final_human:
+                    raise HTTPException(status_code=400, detail="No human turns remaining")
+            else:
+                if human_turns >= 5:
+                    raise HTTPException(status_code=400, detail="No human turns remaining")
+
+            # Human message
+            human_tid = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=human_role_id,
+                phase="ROUND_2",
+                content=content,
+                visible_to_human=True,
+                round_number=2,
+                metadata={"partner": partner, "sender": "human", "index": human_turns},
+            )
+            convo["human_turns_used"] = human_turns + 1
+            if post_interrupt:
+                convo["final_human_sent"] = True
+            await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, human_tid)
+
+            # AI reply (deterministic stub)
+            reply = await get_ai_responder().respond(content)
+            ai_tid = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=partner,
+                phase="ROUND_2",
+                content=reply,
+                visible_to_human=True,
+                round_number=2,
+                metadata={"partner": human_role_id, "sender": "ai", "index": ai_turns},
+            )
+            convo["ai_turns_used"] = ai_turns + 1
+            if post_interrupt:
+                convo["final_ai_sent"] = True
+
+            next_status = "ROUND_2_CONVERSATION_ACTIVE"
+            # Interrupt trigger after 5 exchanges
+            interrupt_tid = None
+            if not post_interrupt and convo["human_turns_used"] >= 5 and convo["ai_turns_used"] >= 5:
+                interrupt_tid = await insert_transcript_entry(
+                    session,
+                    game_id,
+                    role_id=CHAIR,
+                    phase="ROUND_2",
+                    content="The Chair interrupts. Please move to final statements.",
+                    visible_to_human=True,
+                    round_number=2,
+                    metadata={"interrupt": True},
+                )
+                convo["post_interrupt"] = True
+                convo["phase"] = "POST_INTERRUPT"
+
+            # Closure after final exchange
+            if convo.get("post_interrupt") and convo.get("final_human_sent") and convo.get("final_ai_sent"):
+                convo["status"] = "CLOSED"
+                convo["phase"] = "CLOSED"
+                round2["active_convo_index"] = None
+                next_status = "ROUND_2_SELECT_CONVO_2"
+
+            await persist_state(session, game_id, next_status, state, ai_tid)
+
+            if interrupt_tid:
+                await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, interrupt_tid)
+
             return {"game_id": game_id, "state": state}
 
         raise HTTPException(status_code=400, detail="Unsupported event")
