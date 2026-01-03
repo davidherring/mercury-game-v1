@@ -225,6 +225,53 @@ async def get_game(game_id: uuid.UUID, session: AsyncSession = Depends(get_sessi
     return {"game": game_obj, "state": state}
 
 
+@app.get("/games/{game_id}/transcript")
+async def get_transcript(
+    game_id: uuid.UUID, visible_to_human: Optional[bool] = None, session: AsyncSession = Depends(get_session)
+):
+    # Verify game exists
+    exists = await session.execute(text("SELECT 1 FROM games WHERE id = :id LIMIT 1"), {"id": str(game_id)})
+    if not exists.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    where_clause = "WHERE game_id = :game_id"
+    params: Dict[str, Any] = {"game_id": str(game_id)}
+    if visible_to_human is not None:
+        where_clause += " AND visible_to_human = :visible"
+        params["visible"] = visible_to_human
+
+    result = await session.execute(
+        text(
+            f"""
+            SELECT id, game_id, role_id, phase, round, issue_id, visible_to_human, content, metadata, created_at
+            FROM transcript_entries
+            {where_clause}
+            ORDER BY created_at ASC, id ASC
+            """
+        ),
+        params,
+    )
+    entries = []
+    for row in result.mappings():
+        created_at = row["created_at"]
+        created_at_str = created_at.replace(tzinfo=datetime.timezone.utc).isoformat() if hasattr(created_at, "isoformat") else str(created_at)
+        entries.append(
+            {
+                "id": str(row["id"]),
+                "game_id": str(row["game_id"]),
+                "role_id": row["role_id"],
+                "phase": row["phase"],
+                "round": row["round"],
+                "issue_id": row["issue_id"],
+                "visible_to_human": row["visible_to_human"],
+                "content": row["content"],
+                "metadata": row["metadata"],
+                "created_at": created_at_str,
+            }
+        )
+    return entries
+
+
 @app.post("/games", response_model=GameResponse)
 async def create_game(req: CreateGameRequest, session: AsyncSession = Depends(get_session)):
     seed = random.getrandbits(63)
