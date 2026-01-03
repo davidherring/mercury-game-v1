@@ -396,7 +396,9 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             cursor = int(round1.get("cursor", 0))
             order = round1.get("speaker_order") or []
             if cursor >= len(order):
-                raise HTTPException(status_code=400, detail="Round 1 already completed")
+                # Already complete; ensure state reflects transition.
+                await persist_state(session, game_id, "ROUND_2_SETUP", state)
+                return {"game_id": game_id, "state": state}
 
             speaker_id = order[cursor]
             openings = round1.get("openings", {})
