@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(scope="session")
 async def test_db_connectivity_select_one():
     url = os.getenv("SUPABASE_DATABASE_URL")
     if not url:

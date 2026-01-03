@@ -188,6 +188,43 @@ async def health() -> Dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/games/{game_id}")
+async def get_game(game_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    result = await session.execute(
+        text(
+            """
+            SELECT g.id, g.user_id, g.human_role_id, g.status, g.seed, g.created_at, g.updated_at, gs.state
+            FROM games g
+            JOIN game_state gs ON gs.game_id = g.id
+            WHERE g.id = :id
+            """
+        ),
+        {"id": str(game_id)},
+    )
+    row = result.mappings().first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Game not found")
+    state = row["state"] if isinstance(row["state"], dict) else json.loads(row["state"])
+    if state is None:
+        raise HTTPException(status_code=404, detail="Game state not found")
+
+    def _iso(val: Any) -> Optional[str]:
+        if val is None:
+            return None
+        return val.replace(tzinfo=datetime.timezone.utc).isoformat() if hasattr(val, "isoformat") else str(val)
+
+    game_obj = {
+        "id": str(row["id"]),
+        "user_id": str(row["user_id"]) if row["user_id"] else None,
+        "human_role_id": row["human_role_id"],
+        "status": row["status"],
+        "seed": int(row["seed"]),
+        "created_at": _iso(row["created_at"]),
+        "updated_at": _iso(row["updated_at"]),
+    }
+    return {"game": game_obj, "state": state}
+
+
 @app.post("/games", response_model=GameResponse)
 async def create_game(req: CreateGameRequest, session: AsyncSession = Depends(get_session)):
     seed = random.getrandbits(63)

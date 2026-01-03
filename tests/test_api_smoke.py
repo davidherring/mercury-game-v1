@@ -6,7 +6,7 @@ from typing import cast, Any
 from backend.main import app
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(scope="session")
 async def test_health_and_create_game():
     # async with AsyncClient(app=app, base_url="http://testserver") as client:
     transport = ASGITransport(app=cast(Any, app))
