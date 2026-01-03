@@ -39,7 +39,7 @@ class GameResponse(BaseModel):
 
 
 def utc_iso() -> str:
-    return datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
 async def get_or_create_user(session: AsyncSession, user_id: Optional[uuid.UUID]) -> uuid.UUID:
