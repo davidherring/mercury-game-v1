@@ -145,6 +145,22 @@ async def persist_state_no_checkpoint(session: AsyncSession, game_id: uuid.UUID,
     )
 
 
+def _proposal_support(state: Dict[str, Any], issue_id: str, options: List[Dict[str, Any]]) -> Dict[str, float]:
+    stances = state.get("stances", {})
+    totals: Dict[str, float] = {}
+    for opt in options:
+        oid = opt.get("option_id")
+        total = 0.0
+        for country in COUNTRIES:
+            role_stance = stances.get(country, {}).get(issue_id, {})
+            acc = role_stance.get("acceptance", {}).get(oid)
+            if acc is None:
+                acc = 0.0
+            total += float(acc)
+        totals[oid] = total
+    return totals
+
+
 async def insert_transcript_entry(
     session: AsyncSession,
     game_id: uuid.UUID,
@@ -806,10 +822,10 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                     ai["debate_cursor"] = 0
                     ai["debate_round"] = 2
                     state["round3"]["active_issue"] = ai
-                    await persist_state(session, game_id, "ISSUE_DEBATE_ROUND_2", state)
+                    await persist_state_no_checkpoint(session, game_id, "ISSUE_DEBATE_ROUND_2", state)
                     return {"game_id": game_id, "state": state}
                 else:
-                    await persist_state(session, game_id, "ISSUE_POSITION_FINALIZATION", state)
+                    await persist_state_no_checkpoint(session, game_id, "ISSUE_POSITION_FINALIZATION", state)
                     return {"game_id": game_id, "state": state}
 
             speaker = queue[cursor]
@@ -875,12 +891,121 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                     ai["debate_cursor"] = 0
                     ai["debate_round"] = 2
                     state["round3"]["active_issue"] = ai
-                    # State-only transition: no transcript, so no checkpoint
                     await persist_state_no_checkpoint(session, game_id, "ISSUE_DEBATE_ROUND_2", state)
                 else:
-                    # State-only transition: no transcript, so no checkpoint
                     await persist_state_no_checkpoint(session, game_id, "ISSUE_POSITION_FINALIZATION", state)
 
+            return {"game_id": game_id, "state": state}
+
+        if current_status == "ISSUE_POSITION_FINALIZATION":
+            current_status = "ISSUE_PROPOSAL_SELECTION"
+
+        if current_status == "ISSUE_PROPOSAL_SELECTION":
+            ai = state.get("round3", {}).get("active_issue") or {}
+            issue_id = ai.get("issue_id", "1")
+            opts = ai.get("options", [])
+            support = _proposal_support(state, issue_id, opts)
+            if support:
+                proposed_option = sorted(support.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+            else:
+                proposed_option = opts[0].get("option_id") if opts else None
+            if not proposed_option:
+                raise HTTPException(status_code=400, detail="No options available")
+            ai["proposed_option_id"] = proposed_option
+            ai["proposal_support_snapshot"] = support
+            ai["vote_order"] = COUNTRIES.copy()
+            ai["next_voter_index"] = 0
+            ai["votes"] = {}
+            state["round3"]["active_issue"] = ai
+
+            proposal_template = await fetch_japan_script(session, "PROPOSAL")
+            proposal_text = render_script(proposal_template, option_id=proposed_option)
+            transcript_id = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=CHAIR,
+                phase="ISSUE_PROPOSAL_SELECTION",
+                content=proposal_text,
+                visible_to_human=True,
+                round_number=3,
+                metadata={"issue_id": issue_id, "proposed_option_id": proposed_option},
+            )
+            await persist_state(session, game_id, "ISSUE_VOTE", state, transcript_id)
+            return {"game_id": game_id, "state": state}
+
+        if current_status == "ISSUE_VOTE":
+            ai = state.get("round3", {}).get("active_issue") or {}
+            issue_id = ai.get("issue_id", "1")
+            proposed_option = ai.get("proposed_option_id")
+            vote_order = ai.get("vote_order", COUNTRIES)
+            idx = int(ai.get("next_voter_index", 0))
+            votes = ai.get("votes", {})
+
+            if idx >= len(vote_order):
+                await persist_state_no_checkpoint(session, game_id, "ISSUE_RESOLUTION", state)
+                return {"game_id": game_id, "state": state}
+
+            voter = vote_order[idx]
+            human_role = state.get("human_role_id")
+            if voter == human_role:
+                if event != "HUMAN_VOTE":
+                    raise HTTPException(status_code=400, detail="Human vote required")
+                vote_val = req.payload.get("vote")
+                if vote_val not in ("YES", "NO"):
+                    raise HTTPException(status_code=400, detail="Invalid vote")
+            else:
+                stance = state.get("stances", {}).get(voter, {}).get(issue_id, {}).get("acceptance", {})
+                acc = stance.get(proposed_option)
+                if acc is None:
+                    acc = 0.0
+                vote_val = "YES" if acc >= 0.7 else "NO"
+
+            votes[voter] = vote_val
+            ai["votes"] = votes
+            ai["next_voter_index"] = idx + 1
+            state["round3"]["active_issue"] = ai
+
+            vote_text = f"{voter} votes {vote_val}."
+            vote_tid = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=voter,
+                phase="ISSUE_VOTE",
+                content=vote_text,
+                visible_to_human=True,
+                round_number=3,
+                metadata={"issue_id": issue_id, "voter": voter, "vote": vote_val},
+            )
+            await persist_state(session, game_id, "ISSUE_VOTE", state, vote_tid)
+
+            if ai["next_voter_index"] >= len(vote_order):
+                await persist_state_no_checkpoint(session, game_id, "ISSUE_RESOLUTION", state)
+
+            return {"game_id": game_id, "state": state}
+
+        if current_status == "ISSUE_RESOLUTION":
+            ai = state.get("round3", {}).get("active_issue") or {}
+            issue_id = ai.get("issue_id", "1")
+            votes = ai.get("votes", {})
+            passed = len(votes) == len(COUNTRIES) and all(v == "YES" for v in votes.values())
+            res_template = await fetch_japan_script(session, "VOTE_RESULT_PASS" if passed else "VOTE_RESULT_FAIL")
+            res_text = render_script(res_template)
+            res_tid = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=CHAIR,
+                phase="ISSUE_VOTE",
+                content=res_text,
+                visible_to_human=True,
+                round_number=3,
+                metadata={"issue_id": issue_id, "passed": passed},
+            )
+            ai["resolution"] = {"passed": passed, "final_votes": votes}
+            state["round3"].setdefault("closed_issues", [])
+            if issue_id not in state["round3"]["closed_issues"]:
+                state["round3"]["closed_issues"].append(issue_id)
+            state["round3"]["active_issue"] = ai
+            await persist_state(session, game_id, "ISSUE_RESOLUTION", state, res_tid)
             return {"game_id": game_id, "state": state}
 
         raise HTTPException(status_code=400, detail="Unsupported event")
