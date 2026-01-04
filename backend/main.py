@@ -150,6 +150,8 @@ def _proposal_support(state: Dict[str, Any], issue_id: str, options: List[Dict[s
     totals: Dict[str, float] = {}
     for opt in options:
         oid = opt.get("option_id")
+        if not isinstance(oid, str) or not oid:
+            continue
         total = 0.0
         for country in COUNTRIES:
             role_stance = stances.get(country, {}).get(issue_id, {})
