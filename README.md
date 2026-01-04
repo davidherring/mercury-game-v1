@@ -63,3 +63,36 @@ Health check:
 ```bash
 curl http://localhost:8000/health
 ```
+
+## Testing
+Most tests are **DB-backed integration tests** (FastAPI + async Postgres). Run them locally with a working `SUPABASE_DATABASE_URL` (or equivalent Postgres DSN) in your environment.
+
+**Full suite**
+```bash
+python -m pytest -q
+Single file
+
+python -m pytest -q tests/test_canaries_round3.py
+Single test (fast iteration)
+
+python -m pytest -q -x tests/test_full_game_playthrough.py::test_full_game_playthrough
+Handy flags
+
+Stop on first failure:
+python -m pytest -q -x
+Show print output (debugging):
+
+python -m pytest -q -s -x tests/test_full_game_playthrough.py::test_full_game_playthrough
+Re-run only the last failures:
+
+python -m pytest -q --lf
+Deterministic full playthrough (backend-only)
+Uses FakeLLM to run a deterministic end-to-end playthrough:
+
+python -m pytest -q -x tests/test_full_game_playthrough.py::test_full_game_playthrough
+Canary tests (quick regression tripwires)
+Fast tests intended to fail if key invariants drift (vote sequencing/resolution semantics, checkpoints tracking transcripted actions):
+
+python -m pytest -q -x tests/test_canaries_round3.py
+Note on AI code generation environments
+Some AI code generation environments cannot reach your database and therefore cannot run DB-backed tests. Treat any “tests failed due to DB connectivity” notes as non-authoritative unless the exact pytest command output is included. The source of truth for test status is the local pytest output shown above.
