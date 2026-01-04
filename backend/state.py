@@ -7,6 +7,7 @@ COUNTRIES: List[str] = ["BRA", "CAN", "CHN", "EU", "TZA", "USA"]
 NGOS: List[str] = ["AMAP", "MFF", "WCPA"]
 CHAIR: str = "JPN"
 ISSUES: List[str] = ["1", "2", "3", "4"]
+VOTE_ORDER: List[str] = COUNTRIES
 
 
 def _stable_int(seed: int, salt: str) -> int:
@@ -77,6 +78,7 @@ def pick_opening_variant(role_id: str, seed: int, candidates: List[Dict]) -> Dic
 __all__ = [
     "CHAIR",
     "COUNTRIES",
+    "VOTE_ORDER",
     "NGOS",
     "ISSUES",
     "initial_state",

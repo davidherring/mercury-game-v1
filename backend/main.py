@@ -14,6 +14,7 @@ from .ai import FakeLLM, AIResponder
 from .db import get_session
 from .state import (
     COUNTRIES,
+    VOTE_ORDER,
     CHAIR,
     NGOS,
     ensure_default_stances,
@@ -161,6 +162,12 @@ def _proposal_support(state: Dict[str, Any], issue_id: str, options: List[Dict[s
             total += float(acc)
         totals[oid] = total
     return totals
+
+
+def _canonicalize_votes(ai: Dict[str, Any]) -> None:
+    votes = ai.get("votes")
+    if isinstance(votes, dict):
+        ai["votes"] = {role: votes[role] for role in VOTE_ORDER if role in votes}
 
 
 async def insert_transcript_entry(
@@ -913,7 +920,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 raise HTTPException(status_code=400, detail="No options available")
             ai["proposed_option_id"] = proposed_option
             ai["proposal_support_snapshot"] = support
-            ai["vote_order"] = COUNTRIES.copy()
+            ai["vote_order"] = VOTE_ORDER.copy()
             ai["next_voter_index"] = 0
             ai["votes"] = {}
             state["round3"]["active_issue"] = ai
@@ -937,7 +944,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             ai = state.get("round3", {}).get("active_issue") or {}
             issue_id = ai.get("issue_id", "1")
             proposed_option = ai.get("proposed_option_id")
-            vote_order = ai.get("vote_order", COUNTRIES)
+            vote_order = ai.get("vote_order", VOTE_ORDER)
             idx = int(ai.get("next_voter_index", 0))
             votes = ai.get("votes", {})
 
@@ -962,6 +969,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
 
             votes[voter] = vote_val
             ai["votes"] = votes
+            _canonicalize_votes(ai)
             ai["next_voter_index"] = idx + 1
             state["round3"]["active_issue"] = ai
 
@@ -1005,6 +1013,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             if issue_id not in state["round3"]["closed_issues"]:
                 state["round3"]["closed_issues"].append(issue_id)
             state["round3"]["active_issue"] = ai
+            _canonicalize_votes(ai)
             await persist_state(session, game_id, "ISSUE_RESOLUTION", state, res_tid)
             return {"game_id": game_id, "state": state}
 
