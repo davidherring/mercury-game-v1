@@ -731,8 +731,6 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 raise HTTPException(status_code=400, detail="ROUND_3_START_ISSUE only allowed from ROUND_3_SETUP")
             issue_id = req.payload.get("issue_id", "1")
             human_choice = req.payload.get("human_placement", "random")
-            if issue_id != "1":
-                raise HTTPException(status_code=400, detail="Only issue 1 supported in this sprint")
             if human_choice not in ("first", "random", "skip"):
                 raise HTTPException(status_code=400, detail="Invalid human_placement")
 
