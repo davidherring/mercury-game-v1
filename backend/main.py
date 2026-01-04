@@ -93,6 +93,11 @@ async def persist_state(
     state: Dict[str, Any],
     checkpoint_transcript_id: Optional[uuid.UUID] = None,
 ) -> None:
+    # Ensure deterministic vote ordering before persisting
+    if isinstance(state, dict):
+        ai = state.get("round3", {}).get("active_issue") if isinstance(state.get("round3"), dict) else None
+        if isinstance(ai, dict):
+            _canonicalize_votes(ai)
     state["status"] = status
     state["updated_at"] = utc_iso()
     await session.execute(
