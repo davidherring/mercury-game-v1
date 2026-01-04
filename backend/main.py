@@ -132,6 +132,19 @@ async def persist_state(
         )
 
 
+async def persist_state_no_checkpoint(session: AsyncSession, game_id: uuid.UUID, status: str, state: Dict[str, Any]) -> None:
+    state["status"] = status
+    state["updated_at"] = utc_iso()
+    await session.execute(
+        text("UPDATE games SET status = :status WHERE id = :id"),
+        {"status": status, "id": str(game_id)},
+    )
+    await session.execute(
+        text("UPDATE game_state SET state = :state, updated_at = now() WHERE game_id = :id"),
+        {"state": json.dumps(state), "id": str(game_id)},
+    )
+
+
 async def insert_transcript_entry(
     session: AsyncSession,
     game_id: uuid.UUID,
@@ -202,6 +215,8 @@ def _stable_int(seed: int, salt: str) -> int:
 def _human_placement(queue: List[str], human_role_id: Optional[str], choice: str, seed: int, salt: str) -> List[str]:
     if not human_role_id or human_role_id not in queue:
         return queue
+    if human_role_id == CHAIR:
+        return [r for r in queue if r != human_role_id]
     if choice == "skip":
         return [r for r in queue if r != human_role_id]
     if choice == "first":
@@ -760,7 +775,112 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
         if event == "ISSUE_INTRO_CONTINUE":
             if current_status != "ISSUE_INTRO":
                 raise HTTPException(status_code=400, detail="ISSUE_INTRO_CONTINUE only allowed from ISSUE_INTRO")
-            await persist_state(session, game_id, "ISSUE_DEBATE_ROUND_1", state)
+            ai = state.get("round3", {}).get("active_issue") or {}
+            ai["debate_round"] = 1
+            ai["debate_cursor"] = 0
+            state["round3"]["active_issue"] = ai
+            # State-only transition: no transcript, so no checkpoint
+            await persist_state_no_checkpoint(session, game_id, "ISSUE_DEBATE_ROUND_1", state)
+            return {"game_id": game_id, "state": state}
+
+        # ---- Issue debate rounds ----
+        if current_status in ("ISSUE_DEBATE_ROUND_1", "ISSUE_DEBATE_ROUND_2"):
+            ai = state.get("round3", {}).get("active_issue") or {}
+            issue_id = ai.get("issue_id", "1")
+            human_choice = ai.get("human_placement_choice", "random")
+            debate_round = ai.get("debate_round", 1)
+            cursor = int(ai.get("debate_cursor", 0))
+            queue = ai.get("debate_queue", [])
+
+            # If queue exhausted, advance to next round/state
+            if cursor >= len(queue):
+                if current_status == "ISSUE_DEBATE_ROUND_1":
+                    # build round 2 queue
+                    countries = sorted([r for r in state.get("roles", {}) if state["roles"][r].get("type") == "country"])
+                    ngos = sorted([r for r in state.get("roles", {}) if state["roles"][r].get("type") == "ngo"])
+                    human_role = state.get("human_role_id")
+                    seed = game["seed"]
+                    countries = _human_placement(countries, human_role, human_choice, seed, f"{issue_id}-countries-2")
+                    ngos = _human_placement(ngos, human_role, human_choice, seed, f"{issue_id}-ngos-2")
+                    ai["debate_queue"] = countries + ngos
+                    ai["debate_cursor"] = 0
+                    ai["debate_round"] = 2
+                    state["round3"]["active_issue"] = ai
+                    await persist_state(session, game_id, "ISSUE_DEBATE_ROUND_2", state)
+                    return {"game_id": game_id, "state": state}
+                else:
+                    await persist_state(session, game_id, "ISSUE_POSITION_FINALIZATION", state)
+                    return {"game_id": game_id, "state": state}
+
+            speaker = queue[cursor]
+            human_role = state.get("human_role_id")
+            is_human = speaker == human_role
+
+            if is_human:
+                if event != "HUMAN_DEBATE_MESSAGE":
+                    raise HTTPException(status_code=400, detail="Human debate turn requires HUMAN_DEBATE_MESSAGE")
+                content = req.payload.get("text")
+                if not content:
+                    raise HTTPException(status_code=400, detail="text required")
+                transcript_id = await insert_transcript_entry(
+                    session,
+                    game_id,
+                    role_id=speaker,
+                    phase=current_status,
+                    content=content,
+                    visible_to_human=True,
+                    round_number=3,
+                    metadata={"issue_id": issue_id, "round": debate_round, "speaker": speaker},
+                )
+                ai["debate_cursor"] = cursor + 1
+                state["round3"]["active_issue"] = ai
+                await persist_state(session, game_id, current_status, state, transcript_id)
+                return {"game_id": game_id, "state": state}
+
+            # AI speaker
+            opts = ai.get("options", [])
+            options_text = "; ".join([f"{o.get('option_id')} {o.get('label')}: {o.get('short_description')}" for o in opts])
+            prompt = (
+                f"Role: {speaker}\n"
+                f"Issue: {ai.get('issue_title')} ({issue_id})\n"
+                f"Prompt: {ai.get('ui_prompt')}\n"
+                f"Options: {options_text}\n"
+                f"Deliver a short debate statement (1-2 paragraphs) advocating a position and responding to prior discussion."
+            )
+            reply = await get_ai_responder().respond(prompt)
+            transcript_id = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=speaker,
+                phase=current_status,
+                content=reply,
+                visible_to_human=True,
+                round_number=3,
+                metadata={"issue_id": issue_id, "round": debate_round, "speaker": speaker},
+            )
+            ai["debate_cursor"] = cursor + 1
+            state["round3"]["active_issue"] = ai
+            await persist_state(session, game_id, current_status, state, transcript_id)
+
+            # After writing, check if we should transition on next call
+            if ai["debate_cursor"] >= len(queue):
+                if current_status == "ISSUE_DEBATE_ROUND_1":
+                    countries = sorted([r for r in state.get("roles", {}) if state["roles"][r].get("type") == "country"])
+                    ngos = sorted([r for r in state.get("roles", {}) if state["roles"][r].get("type") == "ngo"])
+                    human_role = state.get("human_role_id")
+                    seed = game["seed"]
+                    countries = _human_placement(countries, human_role, human_choice, seed, f"{issue_id}-countries-2")
+                    ngos = _human_placement(ngos, human_role, human_choice, seed, f"{issue_id}-ngos-2")
+                    ai["debate_queue"] = countries + ngos
+                    ai["debate_cursor"] = 0
+                    ai["debate_round"] = 2
+                    state["round3"]["active_issue"] = ai
+                    # State-only transition: no transcript, so no checkpoint
+                    await persist_state_no_checkpoint(session, game_id, "ISSUE_DEBATE_ROUND_2", state)
+                else:
+                    # State-only transition: no transcript, so no checkpoint
+                    await persist_state_no_checkpoint(session, game_id, "ISSUE_POSITION_FINALIZATION", state)
+
             return {"game_id": game_id, "state": state}
 
         raise HTTPException(status_code=400, detail="Unsupported event")
