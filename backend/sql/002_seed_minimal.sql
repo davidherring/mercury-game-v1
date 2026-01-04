@@ -39,4 +39,41 @@ INSERT INTO japan_scripts (script_key, state, template) VALUES
 INSERT INTO ima_excerpts (excerpt_key, content, source_ref, tags) VALUES
 ('IMA_SAMPLE', 'Approved excerpt placeholder from IMA.', 'IMA p.1', ARRAY['round2','round3']);
 
+-- Issue definitions (canonical, Issue 1)
+INSERT INTO issue_definitions (id, title, description, options) VALUES
+('1',
+ 'If and how to regulate mercury emissions',
+ 'Is global action necessary to address mercury, and what form should action take?',
+ '[
+    {
+      "option_id": "1.1",
+      "label": "Binding emissions limits",
+      "short_description": "Countries adopt legally binding limits on mercury emissions from major sources.",
+      "long_description": "There is sufficient evidence that mercury is a global problem with significant risks. Initiate formal negotiations for a new legally binding mercury convention.",
+      "agent_notes": [
+        "Supported by parties arguing mercury is a global pollutant requiring a global response under the precautionary principle",
+        "Often prioritized by NGOs and Arctic-impacted actors who emphasize long-range transport and vulnerable populations",
+        "Seen as the clearest path to coordinated action (binding commitments, reporting, and accountability), but with higher compliance costs",
+        "Opposed by actors emphasizing scientific uncertainty, national sovereignty, and the economic burden of mandatory controls"
+      ]
+    },
+    {
+      "option_id": "1.2",
+      "label": "Voluntary reduction targets",
+      "short_description": "Countries commit to non-binding targets to reduce mercury emissions.",
+      "long_description": "There is a need for more evidence that mercury is a global problem with significant risks. Enhance voluntary measures.",
+      "agent_notes": [
+        "Supported by parties emphasizing flexibility, sovereignty, and lower near-term costs through non-binding cooperation",
+        "Often framed as \u201cevidence first\u201d: expand monitoring and inventories before committing to a treaty",
+        "Politically attractive to countries with limited capacity or high dependence on emitting sectors, since targets are voluntary",
+        "Criticized by NGOs and Arctic-focused actors as too weak to prevent ongoing harm and delays meaningful reductions"
+      ]
+    }
+ ]'
+)
+ON CONFLICT (id) DO UPDATE SET
+ title = EXCLUDED.title,
+ description = EXCLUDED.description,
+ options = EXCLUDED.options;
+
 COMMIT;
