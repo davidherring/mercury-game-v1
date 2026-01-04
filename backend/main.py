@@ -2,6 +2,7 @@ import datetime
 import json
 import random
 import uuid
+import hashlib
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -191,6 +192,27 @@ def get_ai_responder() -> AIResponder:
     if not hasattr(app.state, "_default_ai_responder"):
         app.state._default_ai_responder = FakeLLM()
     return app.state._default_ai_responder
+
+
+def _stable_int(seed: int, salt: str) -> int:
+    digest = hashlib.sha256(f"{seed}:{salt}".encode("utf-8")).hexdigest()
+    return int(digest, 16) % (2**63)
+
+
+def _human_placement(queue: List[str], human_role_id: Optional[str], choice: str, seed: int, salt: str) -> List[str]:
+    if not human_role_id or human_role_id not in queue:
+        return queue
+    if choice == "skip":
+        return [r for r in queue if r != human_role_id]
+    if choice == "first":
+        others = [r for r in queue if r != human_role_id]
+        return [human_role_id] + others
+    # deterministic random placement
+    others = [r for r in queue if r != human_role_id]
+    if not others:
+        return [human_role_id]
+    idx = _stable_int(seed, salt) % (len(others) + 1)
+    return others[:idx] + [human_role_id] + others[idx:]
 
 
 @app.get("/health")
@@ -668,6 +690,77 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 round_number=2,
             )
             await persist_state(session, game_id, "ROUND_3_SETUP", state, transcript_id)
+            return {"game_id": game_id, "state": state}
+
+        # ---- Round 3 Issue 1 setup and intro ----
+        if event == "ROUND_3_START_ISSUE":
+            if current_status != "ROUND_3_SETUP":
+                raise HTTPException(status_code=400, detail="ROUND_3_START_ISSUE only allowed from ROUND_3_SETUP")
+            issue_id = req.payload.get("issue_id", "1")
+            human_choice = req.payload.get("human_placement", "random")
+            if issue_id != "1":
+                raise HTTPException(status_code=400, detail="Only issue 1 supported in this sprint")
+            if human_choice not in ("first", "random", "skip"):
+                raise HTTPException(status_code=400, detail="Invalid human_placement")
+
+            issue_row = await session.execute(
+                text("SELECT id, title, description, options FROM issue_definitions WHERE id = :id"),
+                {"id": issue_id},
+            )
+            issue = issue_row.mappings().first()
+            if not issue:
+                raise HTTPException(status_code=404, detail="Issue not found")
+            opts = issue["options"]
+            if isinstance(opts, str):
+                opts = json.loads(opts)
+            opts_sorted = sorted(opts, key=lambda o: o.get("option_id"))
+
+            countries = sorted([r for r in state.get("roles", {}) if state["roles"][r].get("type") == "country"])
+            ngos = sorted([r for r in state.get("roles", {}) if state["roles"][r].get("type") == "ngo"])
+            human_role = state.get("human_role_id")
+            seed = game["seed"]
+            countries = _human_placement(countries, human_role, human_choice, seed, f"{issue_id}-countries-1")
+            ngos = _human_placement(ngos, human_role, human_choice, seed, f"{issue_id}-ngos-1")
+            debate_queue = countries + ngos
+
+            state.setdefault("round3", {})
+            state["round3"]["active_issue"] = {
+                "issue_id": issue_id,
+                "issue_title": issue["title"],
+                "ui_prompt": issue["description"],
+                "options": opts_sorted,
+                "human_placement_choice": human_choice,
+                "round_index": 1,
+                "debate_queue": debate_queue,
+                "debate_cursor": 0,
+            }
+            state["round3"]["active_issue_index"] = 0
+
+            issue_intro_template = await fetch_japan_script(session, "ISSUE_INTRO")
+            options_list = "; ".join([f"{o.get('option_id')} {o.get('label')}" for o in opts_sorted])
+            intro_text = render_script(
+                issue_intro_template,
+                issue_id=issue_id,
+                issue_title=issue["title"],
+                options_list=options_list,
+            )
+            transcript_id = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=CHAIR,
+                phase="ISSUE_INTRO",
+                content=intro_text,
+                visible_to_human=True,
+                round_number=3,
+                metadata={"issue_id": issue_id},
+            )
+            await persist_state(session, game_id, "ISSUE_INTRO", state, transcript_id)
+            return {"game_id": game_id, "state": state}
+
+        if event == "ISSUE_INTRO_CONTINUE":
+            if current_status != "ISSUE_INTRO":
+                raise HTTPException(status_code=400, detail="ISSUE_INTRO_CONTINUE only allowed from ISSUE_INTRO")
+            await persist_state(session, game_id, "ISSUE_DEBATE_ROUND_1", state)
             return {"game_id": game_id, "state": state}
 
         raise HTTPException(status_code=400, detail="Unsupported event")
