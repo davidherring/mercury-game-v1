@@ -1117,22 +1117,19 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             ai = state.get("round3", {}).get("active_issue") or {}
             issue_id = ai.get("issue_id", "1")
 
-            async def _write_resolution_if_needed() -> Optional[uuid.UUID]:
+            async def ensure_resolution_written() -> Optional[uuid.UUID]:
                 return await _ensure_resolution_transcript(session, game_id, state, ai, issue_id)
 
             if event == "ISSUE_DEBATE_STEP":
-                res_tid = await _write_resolution_if_needed()
+                res_tid = await ensure_resolution_written()
                 state["round3"]["active_issue"] = ai
                 await persist_state(session, game_id, "ISSUE_RESOLUTION", state, res_tid)
                 return {"game_id": game_id, "state": state}
 
             if event == "ISSUE_RESOLUTION_CONTINUE":
-                res_tid = await _write_resolution_if_needed()
+                res_tid = await ensure_resolution_written()
                 issues_list = state.get("round3", {}).get("issues", ISSUES)
                 closed = state.get("round3", {}).get("closed_issues", [])
-                if isinstance(closed, list) and issue_id and issue_id not in closed:
-                    closed.append(issue_id)
-                    state["round3"]["closed_issues"] = closed
                 closed_count = len(closed) if isinstance(closed, list) else 0
                 total_issues = len(issues_list) if isinstance(issues_list, list) else len(ISSUES)
                 all_closed = closed_count >= total_issues
