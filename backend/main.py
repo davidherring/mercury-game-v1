@@ -15,6 +15,7 @@ from .db import get_session
 from .state import (
     COUNTRIES,
     VOTE_ORDER,
+    ISSUES,
     CHAIR,
     NGOS,
     ensure_default_stances,
@@ -39,6 +40,12 @@ class AdvanceRequest(BaseModel):
 class GameResponse(BaseModel):
     game_id: uuid.UUID
     state: Dict[str, Any]
+
+
+class ReviewResponse(BaseModel):
+    game_id: uuid.UUID
+    transcript: List[Dict[str, Any]]
+    votes: List[Dict[str, Any]]
 
 
 def utc_iso() -> str:
@@ -173,6 +180,36 @@ def _canonicalize_votes(ai: Dict[str, Any]) -> None:
     votes = ai.get("votes")
     if isinstance(votes, dict):
         ai["votes"] = {role: votes[role] for role in VOTE_ORDER if role in votes}
+
+
+async def _ensure_resolution_transcript(
+    session: AsyncSession, game_id: uuid.UUID, state: Dict[str, Any], ai: Dict[str, Any], issue_id: str
+) -> Optional[uuid.UUID]:
+    # Idempotent: write only once
+    if ai.get("resolution_written"):
+        return None
+    votes = ai.get("votes", {})
+    passed = len(votes) == len(COUNTRIES) and all(v == "YES" for v in votes.values())
+    res_template = await fetch_japan_script(session, "VOTE_RESULT_PASS" if passed else "VOTE_RESULT_FAIL")
+    res_text = render_script(res_template)
+    res_tid = await insert_transcript_entry(
+        session,
+        game_id,
+        role_id=CHAIR,
+        phase="ISSUE_VOTE",
+        content=res_text,
+        visible_to_human=True,
+        round_number=3,
+        metadata={"issue_id": issue_id, "passed": passed},
+    )
+    ai["resolution"] = {"passed": passed, "final_votes": votes}
+    ai["resolution_written"] = True
+    state["round3"].setdefault("closed_issues", [])
+    if issue_id not in state["round3"]["closed_issues"]:
+        state["round3"]["closed_issues"].append(issue_id)
+    state["round3"]["active_issue"] = ai
+    _canonicalize_votes(ai)
+    return res_tid
 
 
 async def insert_transcript_entry(
@@ -345,8 +382,72 @@ async def get_transcript(
                 "metadata": row["metadata"],
                 "created_at": created_at_str,
             }
-        )
+    )
     return entries
+
+
+@app.get("/games/{game_id}/review", response_model=ReviewResponse)
+async def get_review(game_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    # Transcript: include all except round2 hidden; require ordering by created_at then id
+    result = await session.execute(
+        text(
+            """
+            SELECT id, game_id, role_id, phase, round, issue_id, visible_to_human, content, metadata, created_at
+            FROM transcript_entries
+            WHERE game_id = :gid
+              AND (
+                (round = 2 AND visible_to_human = true) OR (round != 2 OR round IS NULL)
+              )
+            ORDER BY created_at ASC, id ASC
+            """
+        ),
+        {"gid": str(game_id)},
+    )
+    transcript = []
+    for row in result.mappings():
+        created_at = row["created_at"]
+        created_at_str = created_at.replace(tzinfo=datetime.timezone.utc).isoformat() if hasattr(created_at, "isoformat") else str(created_at)
+        transcript.append(
+            {
+                "id": str(row["id"]),
+                "game_id": str(row["game_id"]),
+                "role_id": row["role_id"],
+                "phase": row["phase"],
+                "round": row["round"],
+                "issue_id": row["issue_id"],
+                "visible_to_human": row["visible_to_human"],
+                "content": row["content"],
+                "metadata": row["metadata"],
+                "created_at": created_at_str,
+            }
+        )
+
+    votes_rows = await session.execute(
+        text(
+            """
+            SELECT id, issue_id, proposal_option_id, votes_by_country, passed, created_at
+            FROM votes
+            WHERE game_id = :gid
+            ORDER BY created_at ASC, id ASC
+            """
+        ),
+        {"gid": str(game_id)},
+    )
+    votes_list = []
+    for row in votes_rows.mappings():
+        c_at = row["created_at"]
+        votes_list.append(
+            {
+                "id": str(row["id"]),
+                "issue_id": row["issue_id"],
+                "proposal_option_id": row["proposal_option_id"],
+                "votes_by_country": row["votes_by_country"],
+                "passed": row["passed"],
+                "created_at": c_at.replace(tzinfo=datetime.timezone.utc).isoformat() if hasattr(c_at, "isoformat") else str(c_at),
+            }
+        )
+
+    return {"game_id": game_id, "transcript": transcript, "votes": votes_list}
 
 
 @app.post("/games", response_model=GameResponse)
@@ -992,6 +1093,22 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             await persist_state(session, game_id, "ISSUE_VOTE", state, vote_tid)
 
             if ai["next_voter_index"] >= len(vote_order):
+                # Persist final vote record to votes table
+                await session.execute(
+                    text(
+                        """
+                        INSERT INTO votes (game_id, issue_id, proposal_option_id, votes_by_country, passed)
+                        VALUES (:game_id, :issue_id, :proposal_option_id, :votes_by_country, :passed)
+                        """
+                    ),
+                    {
+                        "game_id": str(game_id),
+                        "issue_id": issue_id,
+                        "proposal_option_id": proposed_option,
+                        "votes_by_country": json.dumps(ai.get("votes", {})),
+                        "passed": len(ai.get("votes", {})) == len(COUNTRIES) and all(v == "YES" for v in ai.get("votes", {}).values()),
+                    },
+                )
                 await persist_state_no_checkpoint(session, game_id, "ISSUE_RESOLUTION", state)
 
             return {"game_id": game_id, "state": state}
@@ -999,27 +1116,35 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
         if current_status == "ISSUE_RESOLUTION":
             ai = state.get("round3", {}).get("active_issue") or {}
             issue_id = ai.get("issue_id", "1")
-            votes = ai.get("votes", {})
-            passed = len(votes) == len(COUNTRIES) and all(v == "YES" for v in votes.values())
-            res_template = await fetch_japan_script(session, "VOTE_RESULT_PASS" if passed else "VOTE_RESULT_FAIL")
-            res_text = render_script(res_template)
-            res_tid = await insert_transcript_entry(
-                session,
-                game_id,
-                role_id=CHAIR,
-                phase="ISSUE_VOTE",
-                content=res_text,
-                visible_to_human=True,
-                round_number=3,
-                metadata={"issue_id": issue_id, "passed": passed},
-            )
-            ai["resolution"] = {"passed": passed, "final_votes": votes}
-            state["round3"].setdefault("closed_issues", [])
-            if issue_id not in state["round3"]["closed_issues"]:
-                state["round3"]["closed_issues"].append(issue_id)
-            state["round3"]["active_issue"] = ai
-            _canonicalize_votes(ai)
-            await persist_state(session, game_id, "ISSUE_RESOLUTION", state, res_tid)
-            return {"game_id": game_id, "state": state}
+
+            async def _write_resolution_if_needed() -> Optional[uuid.UUID]:
+                return await _ensure_resolution_transcript(session, game_id, state, ai, issue_id)
+
+            if event == "ISSUE_DEBATE_STEP":
+                res_tid = await _write_resolution_if_needed()
+                state["round3"]["active_issue"] = ai
+                await persist_state(session, game_id, "ISSUE_RESOLUTION", state, res_tid)
+                return {"game_id": game_id, "state": state}
+
+            if event == "ISSUE_RESOLUTION_CONTINUE":
+                res_tid = await _write_resolution_if_needed()
+                issues_list = state.get("round3", {}).get("issues", ISSUES)
+                closed = state.get("round3", {}).get("closed_issues", [])
+                if isinstance(closed, list) and issue_id and issue_id not in closed:
+                    closed.append(issue_id)
+                    state["round3"]["closed_issues"] = closed
+                closed_count = len(closed) if isinstance(closed, list) else 0
+                total_issues = len(issues_list) if isinstance(issues_list, list) else len(ISSUES)
+                all_closed = closed_count >= total_issues
+
+                next_status = "REVIEW" if all_closed else "ROUND_3_SETUP"
+                if not all_closed and isinstance(state.get("round3"), dict):
+                    state["round3"]["active_issue"] = None
+                state["status"] = next_status
+                await persist_state(session, game_id, next_status, state, res_tid)
+                return {"game_id": game_id, "state": state}
+
+            # Unsupported event while in ISSUE_RESOLUTION
+            raise HTTPException(status_code=400, detail="ISSUE_RESOLUTION_CONTINUE or ISSUE_DEBATE_STEP required")
 
         raise HTTPException(status_code=400, detail="Unsupported event")
