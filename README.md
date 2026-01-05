@@ -96,3 +96,17 @@ Fast tests intended to fail if key invariants drift (vote sequencing/resolution 
 python -m pytest -q -x tests/test_canaries_round3.py
 Note on AI code generation environments
 Some AI code generation environments cannot reach your database and therefore cannot run DB-backed tests. Treat any “tests failed due to DB connectivity” notes as non-authoritative unless the exact pytest command output is included. The source of truth for test status is the local pytest output shown above.
+
+### Review (end-of-game payload)
+- Endpoint: `GET /games/{game_id}/review`
+- Returns:
+  - `transcript`: chronological transcript entries for the whole game; Round 2 entries are included only when `visible_to_human=true`.
+  - `votes`: one row per Round 3 issue from the `votes` table, including `proposal_option_id`, `votes_by_country`, and `passed`.
+- Example:
+```bash
+curl http://localhost:8000/games/<GAME_ID>/review
+```
+- Round 3 resolution events (UI/testing note):
+  - When `status == ISSUE_RESOLUTION`:
+    - `ISSUE_DEBATE_STEP` is allowed and idempotent (ensures the resolution transcript exists; does not advance).
+    - `ISSUE_RESOLUTION_CONTINUE` advances to `ROUND_3_SETUP` (if issues remain) or `REVIEW` (when all issues are closed).
