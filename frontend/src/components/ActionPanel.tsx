@@ -17,10 +17,32 @@ interface Props {
 
 const FALLBACK_ROLES = ["BRA", "CAN", "CHN", "EU", "TZA", "USA", "WCPA", "MFF", "AMAP"];
 const CHAIR = "JPN";
+const COUNTRY_IDS = new Set(["BRA", "CAN", "CHN", "EU", "TZA", "USA"]);
+const NGO_IDS = new Set(["AMAP", "MFF", "WCPA"]);
 
 function buildPartnerOptions(allRoles: string[], exclude: string[]) {
   const excludeSet = new Set(exclude);
   return allRoles.filter((r) => !excludeSet.has(r));
+}
+
+function sortRoles(roleIds: string[], rolesMeta?: Record<string, any>) {
+  return [...roleIds].sort((a, b) => {
+    const typeA =
+      rolesMeta?.[a]?.type ||
+      rolesMeta?.[a]?.role_type ||
+      rolesMeta?.[a]?.roleType ||
+      (COUNTRY_IDS.has(a) ? "country" : NGO_IDS.has(a) ? "ngo" : rolesMeta?.[a]?.role);
+    const typeB =
+      rolesMeta?.[b]?.type ||
+      rolesMeta?.[b]?.role_type ||
+      rolesMeta?.[b]?.roleType ||
+      (COUNTRY_IDS.has(b) ? "country" : NGO_IDS.has(b) ? "ngo" : rolesMeta?.[b]?.role);
+    const catOrder = (t?: string) => (t === "country" ? 0 : t === "ngo" ? 1 : 2);
+    const catA = catOrder(typeA);
+    const catB = catOrder(typeB);
+    if (catA !== catB) return catA - catB;
+    return a.localeCompare(b);
+  });
 }
 
 export const ActionPanel: React.FC<Props> = ({
@@ -50,9 +72,9 @@ export const ActionPanel: React.FC<Props> = ({
       (gameState && typeof gameState === "object" && (gameState as any).roles) ||
       (gameState && typeof gameState === "object" && (gameState as any).available_roles);
     if (rolesObj && typeof rolesObj === "object") {
-      return Object.keys(rolesObj);
+      return sortRoles(Object.keys(rolesObj), rolesObj as Record<string, any>);
     }
-    return FALLBACK_ROLES;
+    return sortRoles(FALLBACK_ROLES);
   }, [gameState]);
 
   const humanRoleId: string | undefined =
@@ -142,7 +164,7 @@ export const ActionPanel: React.FC<Props> = ({
                 style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
               >
                 <option value="">-- choose --</option>
-                {buildPartnerOptions(roleOptions, [CHAIR]).map((r) => (
+                {sortRoles(buildPartnerOptions(roleOptions, [CHAIR]), gameState?.roles).map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
@@ -188,7 +210,7 @@ export const ActionPanel: React.FC<Props> = ({
                 style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
               >
                 <option value="">-- choose --</option>
-                {buildPartnerOptions(roleOptions, [CHAIR, humanRoleId || ""]).map((r) => (
+                {sortRoles(buildPartnerOptions(roleOptions, [CHAIR, humanRoleId || ""]), gameState?.roles).map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
@@ -240,7 +262,7 @@ export const ActionPanel: React.FC<Props> = ({
                 style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
               >
                 <option value="">-- choose --</option>
-                {buildPartnerOptions(roleOptions, [CHAIR, humanRoleId || "", convo1Partner || ""]).map((r) => (
+                {sortRoles(buildPartnerOptions(roleOptions, [CHAIR, humanRoleId || "", convo1Partner || ""]), gameState?.roles).map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>

@@ -1,11 +1,11 @@
 ## Handled UI statuses
-- ROLE_SELECTION: dropdown of roles (from state.roles or fallback), button sends `ROLE_CONFIRMED` with `{human_role_id}`.
+- ROLE_SELECTION: dropdown of roles (sorted: countries, then NGOs, then others; excludes chair), button sends `ROLE_CONFIRMED` with `{human_role_id}`.
 - ROUND_1_SETUP: button sends `ROUND_1_READY {}`.
 - ROUND_1_OPENING_STATEMENTS / ROUND_1_STEP: button sends `ROUND_1_STEP {}`.
 - ROUND_2_SETUP: button sends `ROUND_2_READY {}`.
-- ROUND_2_SELECT_CONVO_1: partner dropdown (excludes chair/human), button sends `CONVO_1_SELECTED {partner_role_id}`.
+- ROUND_2_SELECT_CONVO_1: partner dropdown (sorted; excludes chair/human), button sends `CONVO_1_SELECTED {partner_role_id}`.
 - ROUND_2_CONVERSATION_ACTIVE: textarea sends `CONVO_1_MESSAGE {content}` then clears.
-- ROUND_2_SELECT_CONVO_2: partner dropdown (excludes chair/human/convo1 partner), buttons send `CONVO_2_SELECTED {partner_role_id}` or `CONVO_2_SKIPPED {}`.
+- ROUND_2_SELECT_CONVO_2: partner dropdown (sorted; excludes chair/human/convo1 partner), buttons send `CONVO_2_SELECTED {partner_role_id}` or `CONVO_2_SKIPPED {}`.
 - ROUND_2_WRAP_UP: button sends `ROUND_2_WRAP_READY {}`.
 - ROUND_3_SETUP: shows “Next issue” (selectable dropdown from state.round3.issues, defaulting to first unresolved/not-active); human placement select; button sends `ROUND_3_START_ISSUE {issue_id, human_placement}`.
 - ISSUE_INTRO: button sends `ISSUE_INTRO_CONTINUE {}`.
