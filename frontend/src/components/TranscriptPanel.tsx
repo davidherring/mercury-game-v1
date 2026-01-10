@@ -20,6 +20,13 @@ type TranscriptRow = {
   [key: string]: any;
 };
 
+function displayRound(row: TranscriptRow): string | number {
+  if (typeof row.round === "number") return row.round;
+  const phase = row.phase || "";
+  if (phase.startsWith("ROUND_1")) return 1;
+  return "?";
+}
+
 export const TranscriptPanel: React.FC<Props> = ({ gameId, api, onRequest, onError, refreshToken }) => {
   const [entries, setEntries] = useState<TranscriptRow[]>([]);
   const [visibleOnly, setVisibleOnly] = useState(true);
@@ -78,7 +85,7 @@ export const TranscriptPanel: React.FC<Props> = ({ gameId, api, onRequest, onErr
             return (
               <div key={row.id || idx} style={{ padding: "6px 0", borderBottom: "1px solid #f0f0f0" }}>
                 <div style={{ fontSize: 12, color: "#555" }}>
-                  {row.role_id || "?"} — round {row.round ?? "?"} / {row.phase || "?"}
+                  {row.role_id || "?"} — round {displayRound(row)} / {row.phase || "?"}
                 </div>
                 <div style={{ marginTop: 2 }}>{text}</div>
               </div>

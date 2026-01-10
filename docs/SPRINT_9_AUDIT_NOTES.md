@@ -51,3 +51,4 @@
 - ROUND_3_SETUP now derives the next issue from backend state (issues[active_issue_index]) and auto-loads review when status becomes REVIEW.
 - ISSUE_RESOLUTION mapping corrected: UI now sends `ISSUE_RESOLUTION_CONTINUE` (400 previously complained “ISSUE_RESOLUTION_CONTINUE or ISSUE_DEBATE_STEP required”).
 - ROUND_3_SETUP issue selection now uses dropdown and defaults to the first unresolved issue (no longer read-only on active_issue_index), preventing repeat of issue 1.
+- Transcript display now infers round 1 from phase strings when round field is missing so Round 1 entries render as “round 1”.
