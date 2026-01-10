@@ -12,7 +12,7 @@
 - ISSUE_DEBATE_ROUND_1 / ISSUE_DEBATE_ROUND_2 / ISSUE_VOTE / ISSUE_RESOLUTION:
   - If it is the human’s debate turn (active_issue.debate_queue[debate_cursor] === human_role_id): textarea sends `HUMAN_DEBATE_MESSAGE {text}` (clears after send). No debate step shown in this branch.
   - If it is the human’s vote turn (status ISSUE_VOTE and vote_order[next_voter_index] === human_role_id): YES/NO radios for proposed_option_id; button sends `HUMAN_VOTE {vote: "YES"|"NO"}`.
-  - If not human turn and status is ISSUE_RESOLUTION: button sends `CONTINUE {}`.
+  - If not human turn and status is ISSUE_RESOLUTION: button sends `ISSUE_RESOLUTION_CONTINUE {}`.
   - Else (not human turn during debate): button sends `ISSUE_DEBATE_STEP {}`.
 - ISSUE_POSITION_FINALIZATION / ISSUE_PROPOSAL_SELECTION: button sends `CONTINUE {}`.
 - Default/unknown: shows “No controls…”; when Dev toggle is on, shows “Try CONTINUE” sending `CONTINUE {}`.
@@ -48,3 +48,5 @@
 - ActionPanel updated to gate human debate UI to human turn only and to add CONTINUE handling for ISSUE_RESOLUTION/ISSUE_POSITION_FINALIZATION/ISSUE_PROPOSAL_SELECTION.
 - HUMAN_VOTE payload normalized to `{vote: "YES"|"NO"}` based on proposed_option_id; human debate payload uses `{text: ...}`.
 - Removed duplicate `isHumanDebateTurn` declaration in ActionPanel.tsx to restore frontend compilation (no behavior change).
+- ROUND_3_SETUP now derives the next issue from backend state (issues[active_issue_index]) and auto-loads review when status becomes REVIEW.
+- ISSUE_RESOLUTION mapping corrected: UI now sends `ISSUE_RESOLUTION_CONTINUE` (400 previously complained “ISSUE_RESOLUTION_CONTINUE or ISSUE_DEBATE_STEP required”).

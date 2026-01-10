@@ -24,7 +24,10 @@ export const App: React.FC = () => {
   const [loadingReview, setLoadingReview] = useState(false);
   const [requiredAction, setRequiredAction] = useState<string | null>(null);
 
-  const refreshAll = async () => {
+  const refreshAll = async (nextState?: any) => {
+    if (nextState && typeof nextState === "object") {
+      setStateObj(nextState);
+    }
     if (refreshStateFn) {
       await refreshStateFn();
     }
@@ -50,6 +53,12 @@ export const App: React.FC = () => {
     }
     setLoadingReview(false);
   };
+
+  React.useEffect(() => {
+    if (gameId && stateObj?.status === "REVIEW" && !loadingReview) {
+      void fetchReview();
+    }
+  }, [gameId, stateObj?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Placeholder wiring for future use
   const handleSetBase = (val: string) => {
@@ -126,7 +135,7 @@ export const App: React.FC = () => {
             }
             setLastError(msg || undefined);
           }}
-          onAdvanced={() => refreshAll()}
+          onAdvanced={(st) => refreshAll(st)}
           requiredAction={requiredAction}
           onClearRequiredAction={() => persistRequiredAction(gameId, null)}
         />

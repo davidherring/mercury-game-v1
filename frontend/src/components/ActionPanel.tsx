@@ -39,10 +39,12 @@ export const ActionPanel: React.FC<Props> = ({
   const [payloadText, setPayloadText] = useState("{}");
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [message, setMessage] = useState<string>("");
-  const [issueId, setIssueId] = useState<string>("1");
   const [humanPlacement, setHumanPlacement] = useState<"first" | "random" | "skip">("random");
   const [selectedOption, setSelectedOption] = useState<string>("");
   const [debateMessage, setDebateMessage] = useState<string>("");
+  const issues: string[] = gameState?.round3?.issues || [];
+  const activeIdx: number = typeof gameState?.round3?.active_issue_index === "number" ? gameState.round3.active_issue_index : 0;
+  const nextIssueId = issues[activeIdx] || "";
 
   const roleOptions = useMemo(() => {
     const rolesObj =
@@ -254,7 +256,22 @@ export const ActionPanel: React.FC<Props> = ({
       case "ROUND_3_SETUP":
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div>Next issue: {issueId}</div>
+            <div>Next issue: {nextIssueId || "(unavailable)"}</div>
+            {issues.length > 0 && (
+              <label>
+                Select issue:
+                <select
+                  value={nextIssueId}
+                  onChange={(e) => {}}
+                  disabled
+                  style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+                >
+                  {issues.map((id) => (
+                    <option key={id} value={id}>{id}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label>
               Human placement:
               <select
@@ -269,9 +286,10 @@ export const ActionPanel: React.FC<Props> = ({
             </label>
             <button
               onClick={() =>
-                doAdvance("ROUND_3_START_ISSUE", { issue_id: issueId || "1", human_placement: humanPlacement })
+                doAdvance("ROUND_3_START_ISSUE", { issue_id: nextIssueId, human_placement: humanPlacement })
               }
               style={{ padding: "8px 12px" }}
+              disabled={!nextIssueId}
             >
               Start Issue
             </button>
@@ -359,7 +377,7 @@ export const ActionPanel: React.FC<Props> = ({
         }
         if (status === "ISSUE_RESOLUTION") {
           return (
-            <button onClick={() => doAdvance("CONTINUE", {})} style={{ padding: "8px 12px" }}>
+            <button onClick={() => doAdvance("ISSUE_RESOLUTION_CONTINUE", {})} style={{ padding: "8px 12px" }}>
               Continue
             </button>
           );
