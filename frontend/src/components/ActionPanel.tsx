@@ -11,6 +11,8 @@ interface Props {
   onRequest: (req: DebugInfo) => void;
   onError: (msg: string | null) => void;
   onAdvanced: () => Promise<void> | void;
+  requiredAction?: string | null;
+  onClearRequiredAction?: () => void;
 }
 
 const FALLBACK_ROLES = ["BRA", "CAN", "CHN", "EU", "TZA", "USA", "WCPA", "MFF", "AMAP"];
@@ -29,12 +31,18 @@ export const ActionPanel: React.FC<Props> = ({
   onRequest,
   onError,
   onAdvanced,
+  requiredAction,
+  onClearRequiredAction,
 }) => {
   const [devMode, setDevMode] = useState(false);
   const [rawEvent, setRawEvent] = useState("ROUND_1_READY");
   const [payloadText, setPayloadText] = useState("{}");
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [message, setMessage] = useState<string>("");
+  const [issueId, setIssueId] = useState<string>("1");
+  const [humanPlacement, setHumanPlacement] = useState<"first" | "random" | "skip">("random");
+  const [selectedOption, setSelectedOption] = useState<string>("");
+  const [debateMessage, setDebateMessage] = useState<string>("");
 
   const roleOptions = useMemo(() => {
     const rolesObj =
@@ -52,6 +60,13 @@ export const ActionPanel: React.FC<Props> = ({
     undefined;
   const convo1Partner: string | undefined =
     gameState?.round2?.convo1?.partner_role || gameState?.round2?.convo1?.partner_role_id;
+  const activeIssue = gameState?.round3?.active_issue;
+  const needsHumanVote =
+    status === "ISSUE_VOTE" &&
+    activeIssue &&
+    activeIssue.vote_order &&
+    activeIssue.votes &&
+    activeIssue.vote_order[activeIssue.next_voter_index] === gameState?.human_role_id;
 
   const doAdvance = async (event: string, payload: Record<string, unknown>) => {
     if (!gameId) {
@@ -230,6 +245,127 @@ export const ActionPanel: React.FC<Props> = ({
             Wrap up
           </button>
         );
+      case "ROUND_3_SETUP":
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label>
+              Issue ID:
+              <input
+                type="text"
+                value={issueId}
+                onChange={(e) => setIssueId(e.target.value)}
+                style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+              />
+            </label>
+            <label>
+              Human placement:
+              <select
+                value={humanPlacement}
+                onChange={(e) => setHumanPlacement(e.target.value as any)}
+                style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+              >
+                <option value="first">first</option>
+                <option value="random">random</option>
+                <option value="skip">skip</option>
+              </select>
+            </label>
+            <button
+              onClick={() =>
+                doAdvance("ROUND_3_START_ISSUE", { issue_id: issueId || "1", human_placement: humanPlacement })
+              }
+              style={{ padding: "8px 12px" }}
+            >
+              Start Issue
+            </button>
+          </div>
+        );
+      case "ISSUE_INTRO":
+        return (
+          <button onClick={() => doAdvance("ISSUE_INTRO_CONTINUE", {})} style={{ padding: "8px 12px" }}>
+            Continue
+          </button>
+        );
+      case "ISSUE_DEBATE_ROUND_1":
+      case "ISSUE_DEBATE_ROUND_2":
+      case "ISSUE_VOTE":
+      case "ISSUE_RESOLUTION": {
+        if (needsHumanVote) {
+          const options = Array.isArray(activeIssue?.options) ? activeIssue.options : [];
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 12, color: "#555" }}>Cast your vote</div>
+              {options.length === 0 && <div style={{ color: "#999" }}>No options available.</div>}
+              {options.map((opt: any) => (
+                <label key={opt.option_id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="radio"
+                    name="vote-option"
+                    value={opt.option_id}
+                    checked={selectedOption === opt.option_id}
+                    onChange={(e) => setSelectedOption(e.target.value)}
+                  />
+                  <span>{opt.option_id}: {opt.label || opt.title || opt.short_description || ""}</span>
+                </label>
+              ))}
+              <button
+                onClick={() => doAdvance("HUMAN_VOTE", { proposal_option_id: selectedOption })}
+                disabled={!selectedOption}
+                style={{ padding: "8px 12px" }}
+              >
+                Submit Vote
+              </button>
+            </div>
+          );
+        }
+        const showHumanDebate = true; // fall back to showing composer when prompted
+        if (showHumanDebate) {
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 12, color: "#555" }}>Human debate (only when prompted)</div>
+              <textarea
+                value={debateMessage}
+                onChange={(e) => setDebateMessage(e.target.value)}
+                rows={3}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+              />
+              <button
+                onClick={() =>
+                  doAdvance("HUMAN_DEBATE_MESSAGE", { text: debateMessage }).then(() => {
+                    setDebateMessage("");
+                    onClearRequiredAction?.();
+                  })
+                }
+                disabled={!debateMessage.trim()}
+                style={{ padding: "8px 12px" }}
+              >
+                Send debate message
+              </button>
+              {requiredAction === "human_debate" && (
+                <div style={{ fontSize: 12, color: "#b00" }}>Backend requires a human debate message before advancing.</div>
+              )}
+              <button
+                onClick={() => doAdvance("ISSUE_DEBATE_STEP", {})}
+                style={{ padding: "8px 12px" }}
+                disabled={requiredAction === "human_debate"}
+              >
+                Debate step
+              </button>
+            </div>
+          );
+        }
+        if (status === "ISSUE_RESOLUTION") {
+          return (
+            <button onClick={() => doAdvance("ISSUE_RESOLUTION_CONTINUE", {})} style={{ padding: "8px 12px" }}>
+              Continue
+            </button>
+          );
+        }
+        return (
+          <button onClick={() => doAdvance("ISSUE_DEBATE_STEP", {})} style={{ padding: "8px 12px" }}>
+            Debate step
+          </button>
+        );
+      }
       default:
         return <div style={{ color: "#999" }}>No controls implemented for this status yet.</div>;
     }
