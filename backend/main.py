@@ -360,7 +360,7 @@ async def get_transcript(
             SELECT id, game_id, role_id, phase, round, issue_id, visible_to_human, content, metadata, created_at
             FROM transcript_entries
             {where_clause}
-            ORDER BY created_at ASC, id ASC
+            ORDER BY created_at ASC, COALESCE((metadata->>'index')::int, 0) ASC, id ASC
             """
         ),
         params,
@@ -398,7 +398,7 @@ async def get_review(game_id: uuid.UUID, session: AsyncSession = Depends(get_ses
               AND (
                 (round = 2 AND visible_to_human = true) OR (round != 2 OR round IS NULL)
               )
-            ORDER BY created_at ASC, id ASC
+            ORDER BY created_at ASC, COALESCE((metadata->>'index')::int, 0) ASC, id ASC
             """
         ),
         {"gid": str(game_id)},
@@ -593,7 +593,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 phase="ROUND_1_OPENING_STATEMENTS",
                 content=intro_text,
                 visible_to_human=True,
-                metadata={"cursor": cursor},
+                metadata={"cursor": cursor, "index": cursor * 2},
             )
             speaker_transcript_id = await insert_transcript_entry(
                 session,
@@ -602,7 +602,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 phase="ROUND_1_OPENING_STATEMENTS",
                 content=opening["text"],
                 visible_to_human=True,
-                metadata={"cursor": cursor},
+                metadata={"cursor": cursor, "index": cursor * 2 + 1},
             )
 
             round1["cursor"] = cursor + 1
@@ -703,7 +703,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 content=content,
                 visible_to_human=True,
                 round_number=2,
-                metadata={"partner": partner, "sender": "human", "index": human_turns, "convo": convo_key},
+                metadata={"partner": partner, "sender": "human", "index": human_turns * 2, "convo": convo_key},
             )
             convo["human_turns_used"] = human_turns + 1
             if post_interrupt:
@@ -719,7 +719,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 content=reply,
                 visible_to_human=True,
                 round_number=2,
-                metadata={"partner": human_role_id, "sender": "ai", "index": ai_turns, "convo": convo_key},
+                metadata={"partner": human_role_id, "sender": "ai", "index": ai_turns * 2 + 1, "convo": convo_key},
             )
             convo["ai_turns_used"] = ai_turns + 1
             if post_interrupt:
@@ -736,7 +736,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                     content="The Chair interrupts. Please move to final statements.",
                     visible_to_human=True,
                     round_number=2,
-                    metadata={"interrupt": True, "convo": convo_key},
+                    metadata={"interrupt": True, "convo": convo_key, "index": convo["human_turns_used"] + convo["ai_turns_used"]},
                 )
                 convo["post_interrupt"] = True
                 convo["phase"] = "POST_INTERRUPT"
