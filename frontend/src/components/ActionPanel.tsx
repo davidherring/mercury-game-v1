@@ -254,15 +254,7 @@ export const ActionPanel: React.FC<Props> = ({
       case "ROUND_3_SETUP":
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label>
-              Issue ID:
-              <input
-                type="text"
-                value={issueId}
-                onChange={(e) => setIssueId(e.target.value)}
-                style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
-              />
-            </label>
+            <div>Next issue: {issueId}</div>
             <label>
               Human placement:
               <select
@@ -337,49 +329,6 @@ export const ActionPanel: React.FC<Props> = ({
             </div>
           );
         }
-        const showHumanDebate = true; // fall back to showing composer when prompted
-        if (showHumanDebate) {
-          return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ fontSize: 12, color: "#555" }}>Human debate (only when prompted)</div>
-              <textarea
-                value={debateMessage}
-                onChange={(e) => setDebateMessage(e.target.value)}
-                rows={3}
-                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
-              />
-              <button
-                onClick={() =>
-                  doAdvance("HUMAN_DEBATE_MESSAGE", { text: debateMessage }).then(() => {
-                    setDebateMessage("");
-                    onClearRequiredAction?.();
-                  })
-                }
-                disabled={!debateMessage.trim()}
-                style={{ padding: "8px 12px" }}
-              >
-                Send debate message
-              </button>
-              {requiredAction === "human_debate" && (
-                <div style={{ fontSize: 12, color: "#b00" }}>Backend requires a human debate message before advancing.</div>
-              )}
-              <button
-                onClick={() => doAdvance("ISSUE_DEBATE_STEP", {})}
-                style={{ padding: "8px 12px" }}
-                disabled={requiredAction === "human_debate"}
-              >
-                Debate step
-              </button>
-            </div>
-          );
-        }
-        if (status === "ISSUE_RESOLUTION") {
-          return (
-            <button onClick={() => doAdvance("CONTINUE", {})} style={{ padding: "8px 12px" }}>
-              Continue
-            </button>
-          );
-        }
         if (isHumanDebateTurn) {
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -402,7 +351,17 @@ export const ActionPanel: React.FC<Props> = ({
               >
                 Send debate message
               </button>
+              {requiredAction === "human_debate" && (
+                <div style={{ fontSize: 12, color: "#b00" }}>Backend requires a human debate message before advancing.</div>
+              )}
             </div>
+          );
+        }
+        if (status === "ISSUE_RESOLUTION") {
+          return (
+            <button onClick={() => doAdvance("CONTINUE", {})} style={{ padding: "8px 12px" }}>
+              Continue
+            </button>
           );
         }
         return (
