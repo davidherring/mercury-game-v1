@@ -31,6 +31,13 @@ Run the API:
 uvicorn backend.main:app --reload
 ```
 
+Env files:
+- Default backend env is loaded from `apps/api/.env` (or `ENV_FILE`/`MERCURY_ENV_FILE` if set). Ensure `SUPABASE_DATABASE_URL` is present there.
+- Example from repo root:
+```bash
+ENV_FILE=apps/api/.env uvicorn backend.main:app --reload
+```
+
 ### API quickstart
 Create a game:
 ```bash
