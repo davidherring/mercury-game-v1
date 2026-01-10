@@ -13,7 +13,13 @@ interface Props {
   onAdvanced: () => Promise<void> | void;
 }
 
-const FALLBACK_ROLES = ["BRA", "CAN", "CHN", "EU", "TZA", "USA"];
+const FALLBACK_ROLES = ["BRA", "CAN", "CHN", "EU", "TZA", "USA", "WCPA", "MFF", "AMAP"];
+const CHAIR = "JPN";
+
+function buildPartnerOptions(allRoles: string[], exclude: string[]) {
+  const excludeSet = new Set(exclude);
+  return allRoles.filter((r) => !excludeSet.has(r));
+}
 
 export const ActionPanel: React.FC<Props> = ({
   gameId,
@@ -28,6 +34,7 @@ export const ActionPanel: React.FC<Props> = ({
   const [rawEvent, setRawEvent] = useState("ROUND_1_READY");
   const [payloadText, setPayloadText] = useState("{}");
   const [selectedRole, setSelectedRole] = useState<string>("");
+  const [message, setMessage] = useState<string>("");
 
   const roleOptions = useMemo(() => {
     const rolesObj =
@@ -38,6 +45,13 @@ export const ActionPanel: React.FC<Props> = ({
     }
     return FALLBACK_ROLES;
   }, [gameState]);
+
+  const humanRoleId: string | undefined =
+    (gameState && (gameState as any).human_role_id) ||
+    (gameState && (gameState as any).humanRoleId) ||
+    undefined;
+  const convo1Partner: string | undefined =
+    gameState?.round2?.convo1?.partner_role || gameState?.round2?.convo1?.partner_role_id;
 
   const doAdvance = async (event: string, payload: Record<string, unknown>) => {
     if (!gameId) {
@@ -90,7 +104,7 @@ export const ActionPanel: React.FC<Props> = ({
                 style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
               >
                 <option value="">-- choose --</option>
-                {roleOptions.map((r) => (
+                {buildPartnerOptions(roleOptions, [CHAIR]).map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
@@ -117,6 +131,103 @@ export const ActionPanel: React.FC<Props> = ({
         return (
           <button onClick={() => doAdvance("ROUND_1_STEP", {})} style={{ padding: "8px 12px" }}>
             Next
+          </button>
+        );
+      case "ROUND_2_SETUP":
+        return (
+          <button onClick={() => doAdvance("ROUND_2_READY", {})} style={{ padding: "8px 12px" }}>
+            Round 2 Ready
+          </button>
+        );
+      case "ROUND_2_SELECT_CONVO_1": {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label>
+              Conversation partner:
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+              >
+                <option value="">-- choose --</option>
+                {buildPartnerOptions(roleOptions, [CHAIR, humanRoleId || ""]).map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              onClick={() => doAdvance("CONVO_1_SELECTED", { partner_role_id: selectedRole })}
+              disabled={!selectedRole}
+              style={{ padding: "8px 12px" }}
+            >
+              Select conversation partner
+            </button>
+          </div>
+        );
+      }
+      case "ROUND_2_CONVERSATION_ACTIVE":
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label>
+              Message:
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={3}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+              />
+            </label>
+            <small style={{ color: "#666" }}>Backend drives turns; send when status allows.</small>
+            <button
+              onClick={() =>
+                doAdvance("CONVO_1_MESSAGE", { content: message }).then(() => setMessage(""))
+              }
+              disabled={!message.trim()}
+              style={{ padding: "8px 12px" }}
+            >
+              Send message
+            </button>
+          </div>
+        );
+      case "ROUND_2_SELECT_CONVO_2": {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label>
+              Conversation 2 partner:
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+              >
+                <option value="">-- choose --</option>
+                {buildPartnerOptions(roleOptions, [CHAIR, humanRoleId || "", convo1Partner || ""]).map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => doAdvance("CONVO_2_SELECTED", { partner_role_id: selectedRole })}
+                disabled={!selectedRole}
+                style={{ padding: "8px 12px" }}
+              >
+                Select convo2 partner
+              </button>
+              <button onClick={() => doAdvance("CONVO_2_SKIPPED", {})} style={{ padding: "8px 12px" }}>
+                Skip convo2
+              </button>
+            </div>
+          </div>
+        );
+      }
+      case "ROUND_2_WRAP_UP":
+        return (
+          <button onClick={() => doAdvance("ROUND_2_WRAP_READY", {})} style={{ padding: "8px 12px" }}>
+            Wrap up
           </button>
         );
       default:
