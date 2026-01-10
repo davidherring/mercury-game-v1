@@ -291,24 +291,38 @@ export const ActionPanel: React.FC<Props> = ({
       case "ISSUE_RESOLUTION": {
         if (needsHumanVote) {
           const options = Array.isArray(activeIssue?.options) ? activeIssue.options : [];
+          const proposedId = activeIssue?.proposed_option_id;
+          const proposedLabel =
+            options.find((o: any) => o.option_id === proposedId)?.label ||
+            options.find((o: any) => o.option_id === proposedId)?.short_description ||
+            proposedId;
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ fontSize: 12, color: "#555" }}>Cast your vote</div>
-              {options.length === 0 && <div style={{ color: "#999" }}>No options available.</div>}
-              {options.map((opt: any) => (
-                <label key={opt.option_id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ fontSize: 12, color: "#555" }}>Vote on proposal {proposedId}: {proposedLabel}</div>
+              <div style={{ display: "flex", gap: 12 }}>
+                <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
                   <input
                     type="radio"
-                    name="vote-option"
-                    value={opt.option_id}
-                    checked={selectedOption === opt.option_id}
+                    name="vote-yesno"
+                    value="YES"
+                    checked={selectedOption === "YES"}
                     onChange={(e) => setSelectedOption(e.target.value)}
                   />
-                  <span>{opt.option_id}: {opt.label || opt.title || opt.short_description || ""}</span>
+                  <span>YES</span>
                 </label>
-              ))}
+                <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input
+                    type="radio"
+                    name="vote-yesno"
+                    value="NO"
+                    checked={selectedOption === "NO"}
+                    onChange={(e) => setSelectedOption(e.target.value)}
+                  />
+                  <span>NO</span>
+                </label>
+              </div>
               <button
-                onClick={() => doAdvance("HUMAN_VOTE", { proposal_option_id: selectedOption })}
+                onClick={() => doAdvance("HUMAN_VOTE", { vote: selectedOption }).then(() => setSelectedOption(""))}
                 disabled={!selectedOption}
                 style={{ padding: "8px 12px" }}
               >
@@ -366,8 +380,26 @@ export const ActionPanel: React.FC<Props> = ({
           </button>
         );
       }
+      case "ISSUE_POSITION_FINALIZATION":
+      case "ISSUE_PROPOSAL_SELECTION":
+        return (
+          <button onClick={() => doAdvance("CONTINUE", {})} style={{ padding: "8px 12px" }}>
+            Continue
+          </button>
+        );
       default:
-        return <div style={{ color: "#999" }}>No controls implemented for this status yet.</div>;
+        return (
+          <div style={{ color: "#999" }}>
+            No controls implemented for this status yet.
+            {devMode && (
+              <div style={{ marginTop: 8 }}>
+                <button onClick={() => doAdvance("CONTINUE", {})} style={{ padding: "6px 10px" }}>
+                  Try CONTINUE
+                </button>
+              </div>
+            )}
+          </div>
+        );
     }
   };
 
