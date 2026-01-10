@@ -7,7 +7,7 @@
 - ROUND_2_CONVERSATION_ACTIVE: textarea sends `CONVO_1_MESSAGE {content}` then clears.
 - ROUND_2_SELECT_CONVO_2: partner dropdown (excludes chair/human/convo1 partner), buttons send `CONVO_2_SELECTED {partner_role_id}` or `CONVO_2_SKIPPED {}`.
 - ROUND_2_WRAP_UP: button sends `ROUND_2_WRAP_READY {}`.
-- ROUND_3_SETUP: shows “Next issue” (from state.round3.issues[state.round3.active_issue_index]); human placement select; button sends `ROUND_3_START_ISSUE {issue_id, human_placement}`.
+- ROUND_3_SETUP: shows “Next issue” (selectable dropdown from state.round3.issues, defaulting to first unresolved/not-active); human placement select; button sends `ROUND_3_START_ISSUE {issue_id, human_placement}`.
 - ISSUE_INTRO: button sends `ISSUE_INTRO_CONTINUE {}`.
 - ISSUE_DEBATE_ROUND_1 / ISSUE_DEBATE_ROUND_2 / ISSUE_VOTE / ISSUE_RESOLUTION:
   - If it is the human’s debate turn (active_issue.debate_queue[debate_cursor] === human_role_id): textarea sends `HUMAN_DEBATE_MESSAGE {text}` (clears after send). No debate step shown in this branch.
@@ -50,3 +50,4 @@
 - Removed duplicate `isHumanDebateTurn` declaration in ActionPanel.tsx to restore frontend compilation (no behavior change).
 - ROUND_3_SETUP now derives the next issue from backend state (issues[active_issue_index]) and auto-loads review when status becomes REVIEW.
 - ISSUE_RESOLUTION mapping corrected: UI now sends `ISSUE_RESOLUTION_CONTINUE` (400 previously complained “ISSUE_RESOLUTION_CONTINUE or ISSUE_DEBATE_STEP required”).
+- ROUND_3_SETUP issue selection now uses dropdown and defaults to the first unresolved issue (no longer read-only on active_issue_index), preventing repeat of issue 1.

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ApiClient } from "../api/client";
 import { DebugInfo } from "./DebugBox";
 import { runRequest } from "../utils/runRequest";
@@ -42,9 +42,8 @@ export const ActionPanel: React.FC<Props> = ({
   const [humanPlacement, setHumanPlacement] = useState<"first" | "random" | "skip">("random");
   const [selectedOption, setSelectedOption] = useState<string>("");
   const [debateMessage, setDebateMessage] = useState<string>("");
+  const [selectedIssueId, setSelectedIssueId] = useState<string>("");
   const issues: string[] = gameState?.round3?.issues || [];
-  const activeIdx: number = typeof gameState?.round3?.active_issue_index === "number" ? gameState.round3.active_issue_index : 0;
-  const nextIssueId = issues[activeIdx] || "";
 
   const roleOptions = useMemo(() => {
     const rolesObj =
@@ -63,6 +62,7 @@ export const ActionPanel: React.FC<Props> = ({
   const convo1Partner: string | undefined =
     gameState?.round2?.convo1?.partner_role || gameState?.round2?.convo1?.partner_role_id;
   const activeIssue = gameState?.round3?.active_issue;
+  const closedIssues: string[] = gameState?.round3?.closed_issues || [];
   const needsHumanVote =
     status === "ISSUE_VOTE" &&
     activeIssue &&
@@ -75,6 +75,21 @@ export const ActionPanel: React.FC<Props> = ({
     Array.isArray(activeIssue.debate_queue) &&
     typeof activeIssue.debate_cursor === "number" &&
     activeIssue.debate_queue[activeIssue.debate_cursor] === humanRoleId;
+
+  useEffect(() => {
+    if (status !== "ROUND_3_SETUP") {
+      return;
+    }
+    if (!issues || issues.length === 0) {
+      setSelectedIssueId("");
+      return;
+    }
+    const activeIssueId = activeIssue?.issue_id;
+    const next =
+      issues.find((id) => id !== activeIssueId && !closedIssues.includes(id)) ||
+      issues[0];
+    setSelectedIssueId(next);
+  }, [status, issues, activeIssue?.issue_id, closedIssues.join(","), gameId]);
 
   const doAdvance = async (event: string, payload: Record<string, unknown>) => {
     if (!gameId) {
@@ -256,22 +271,20 @@ export const ActionPanel: React.FC<Props> = ({
       case "ROUND_3_SETUP":
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div>Next issue: {nextIssueId || "(unavailable)"}</div>
-            {issues.length > 0 && (
-              <label>
-                Select issue:
-                <select
-                  value={nextIssueId}
-                  onChange={(e) => {}}
-                  disabled
-                  style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
-                >
-                  {issues.map((id) => (
-                    <option key={id} value={id}>{id}</option>
-                  ))}
-                </select>
-              </label>
-            )}
+            <div>Next issue: {selectedIssueId || "(unavailable)"}</div>
+            <label>
+              Select issue:
+              <select
+                value={selectedIssueId}
+                onChange={(e) => setSelectedIssueId(e.target.value)}
+                disabled={issues.length === 0}
+                style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+              >
+                {issues.map((id) => (
+                  <option key={id} value={id}>{id}</option>
+                ))}
+              </select>
+            </label>
             <label>
               Human placement:
               <select
@@ -286,10 +299,10 @@ export const ActionPanel: React.FC<Props> = ({
             </label>
             <button
               onClick={() =>
-                doAdvance("ROUND_3_START_ISSUE", { issue_id: nextIssueId, human_placement: humanPlacement })
+                doAdvance("ROUND_3_START_ISSUE", { issue_id: selectedIssueId, human_placement: humanPlacement })
               }
               style={{ padding: "8px 12px" }}
-              disabled={!nextIssueId}
+              disabled={!selectedIssueId}
             >
               Start Issue
             </button>
