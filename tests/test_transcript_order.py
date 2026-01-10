@@ -1,6 +1,9 @@
 import pytest
+from datetime import datetime, timezone
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import TIMESTAMP
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, cast
 
@@ -18,7 +21,7 @@ async def test_transcript_order_stable_by_index_and_id():
         create.raise_for_status()
         game_id = create.json()["game_id"]
 
-        fixed_ts = "2020-01-01T00:00:00Z"
+        fixed_ts = datetime(2020, 1, 1, tzinfo=timezone.utc)
         entries = [
           {"content": "msg1", "idx": 2},
           {"content": "msg0", "idx": 1},
@@ -28,14 +31,21 @@ async def test_transcript_order_stable_by_index_and_id():
         session: AsyncSession = await agen.__anext__()
         try:
             async with session.begin():
+                stmt = (
+                    text(
+                        """
+                        INSERT INTO transcript_entries (game_id, role_id, phase, round, issue_id, visible_to_human, content, metadata, created_at)
+                        VALUES (:gid, 'USA', 'ROUND_2', 2, NULL, true, :content, :metadata, :created_at)
+                        """
+                    )
+                    .bindparams(
+                        bindparam("metadata", type_=JSONB),
+                        bindparam("created_at", type_=TIMESTAMP(timezone=True)),
+                    )
+                )
                 for e in entries:
                     await session.execute(
-                        text(
-                            """
-                            INSERT INTO transcript_entries (game_id, role_id, phase, round, issue_id, visible_to_human, content, metadata, created_at)
-                            VALUES (:gid, 'TEST', 'ROUND_2', 2, NULL, true, :content, :metadata::jsonb, :created_at::timestamptz)
-                            """
-                        ),
+                        stmt,
                         {
                             "gid": game_id,
                             "content": e["content"],
@@ -68,7 +78,7 @@ async def test_round1_recognize_before_opening():
         resp.raise_for_status()
         contents = [row["content"] for row in resp.json()]
         recognize_idx = next((i for i, c in enumerate(contents) if "I recognize" in c), None)
-        opening_idx = next((i for i, c in enumerate(contents) if "opening" in c or "Opening" in c), None)
+        opening_idx = next((i for i, c in enumerate(contents) if "opening placeholder" in c), None)
         assert recognize_idx is not None and opening_idx is not None
         assert recognize_idx < opening_idx
 
