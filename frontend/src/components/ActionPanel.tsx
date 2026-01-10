@@ -10,7 +10,7 @@ interface Props {
   api: ApiClient;
   onRequest: (req: DebugInfo) => void;
   onError: (msg: string | null) => void;
-  onAdvanced: () => Promise<void> | void;
+  onAdvanced: (state?: any) => Promise<void> | void;
   requiredAction?: string | null;
   onClearRequiredAction?: () => void;
 }
@@ -67,13 +67,19 @@ export const ActionPanel: React.FC<Props> = ({
     activeIssue.vote_order &&
     activeIssue.votes &&
     activeIssue.vote_order[activeIssue.next_voter_index] === gameState?.human_role_id;
+  const isHumanDebateTurn =
+    (status === "ISSUE_DEBATE_ROUND_1" || status === "ISSUE_DEBATE_ROUND_2") &&
+    activeIssue &&
+    Array.isArray(activeIssue.debate_queue) &&
+    typeof activeIssue.debate_cursor === "number" &&
+    activeIssue.debate_queue[activeIssue.debate_cursor] === humanRoleId;
 
   const doAdvance = async (event: string, payload: Record<string, unknown>) => {
     if (!gameId) {
       onError("No game loaded");
       return;
     }
-    const { lastRequest, errorMessage } = await runRequest({
+    const { lastRequest, errorMessage, result } = await runRequest({
       method: "POST",
       url: `/games/${gameId}/advance`,
       body: { event, payload },
@@ -85,7 +91,7 @@ export const ActionPanel: React.FC<Props> = ({
       return;
     }
     onError(null);
-    await Promise.resolve(onAdvanced());
+    await Promise.resolve(onAdvanced((result as any)?.state));
   };
 
   const handleRaw = async () => {
@@ -369,9 +375,34 @@ export const ActionPanel: React.FC<Props> = ({
         }
         if (status === "ISSUE_RESOLUTION") {
           return (
-            <button onClick={() => doAdvance("ISSUE_RESOLUTION_CONTINUE", {})} style={{ padding: "8px 12px" }}>
+            <button onClick={() => doAdvance("CONTINUE", {})} style={{ padding: "8px 12px" }}>
               Continue
             </button>
+          );
+        }
+        if (isHumanDebateTurn) {
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 12, color: "#555" }}>Human debate turn</div>
+              <textarea
+                value={debateMessage}
+                onChange={(e) => setDebateMessage(e.target.value)}
+                rows={3}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+              />
+              <button
+                onClick={() =>
+                  doAdvance("HUMAN_DEBATE_MESSAGE", { text: debateMessage }).then(() => {
+                    setDebateMessage("");
+                    onClearRequiredAction?.();
+                  })
+                }
+                disabled={!debateMessage.trim()}
+                style={{ padding: "8px 12px" }}
+              >
+                Send debate message
+              </button>
+            </div>
           );
         }
         return (
