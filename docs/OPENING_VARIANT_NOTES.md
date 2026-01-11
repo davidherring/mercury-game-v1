@@ -418,4 +418,74 @@ This supports replayability while maintaining realism and strategic coherence.
 
 ---
 
+## Dev Note: AMAP Opening Variants (Design Rationale)
+
+AMAP’s Top Secret constraints define it as a **non-voting scientific authority** whose influence comes from credibility, framing, and persistence rather than bargaining power. The four AMAP variants explore different ways science can shape negotiations without prescribing outcomes. Variant choice affects whether science accelerates action, slows overreach, or reshapes how success is measured.
+
+### AMAP_baseline_v1 — *Neutral Evidence Synthesizer*
+
+**Style:** Calm, authoritative, explanatory
+**Core move:** Establishes shared factual ground on long-range transport and Arctic impacts
+**Gameplay effect:**
+
+* Grounds Round 1 in scientific legitimacy
+* Supports EU and CAN positions without explicit alignment
+* Serves as a reference point in later disputes
+  **Use when:** You want science to stabilize the negotiation without driving urgency
+
+---
+
+### AMAP_early_warning_v2 — *Risk Signal Amplifier*
+
+**Style:** Direct, cautionary, evidence-driven
+**Core move:** Frames Arctic impacts as an urgent global warning
+**Gameplay effect:**
+
+* Increases pressure on major emitters early
+* Raises stakes around delay and incrementalism
+* Strengthens arguments for decisive action
+  **Use when:** You want science to accelerate momentum and sharpen responsibility debates
+
+---
+
+### AMAP_uncertainty_clarifier_v3 — *Credibility Guardian*
+
+**Style:** Careful, technical, boundary-setting
+**Core move:** Separates robust findings from uncertain claims
+**Gameplay effect:**
+
+* Slows overconfident or politicized interpretations of science
+* Supports adaptive or review-based approaches
+* Can weaken absolutist arguments on all sides
+  **Use when:** You want negotiations to hinge on evidence quality and caution
+
+---
+
+### AMAP_implementation_bridge_v4 — *Accountability Architect*
+
+**Style:** Practical, evaluative, forward-looking
+**Core move:** Shifts focus from commitments to measurable outcomes
+**Gameplay effect:**
+
+* Elevates monitoring, reporting, and review mechanisms
+* Pressures parties to justify how success will be measured
+* Supports durable agreements over symbolic ones
+  **Use when:** You want implementation credibility and long-term accountability to dominate
+
+---
+
+### Design Principle
+
+Across all variants:
+
+* **AMAP does not advocate national positions**
+* **Issue preferences remain consistent**
+* **Influence is exerted through framing, not voting**
+
+The variants are not about changing the science. They are about changing **how science enters the room**: as background context, warning signal, constraint on overreach, or test of real-world effectiveness.
+
+This preserves AMAP’s institutional realism while giving science multiple, meaningful roles in gameplay.
+
+---
+
 
