@@ -33,6 +33,14 @@ Run the API:
 uvicorn backend.main:app --reload
 ```
 
+### Database seeding and updates (Supabase)
+- The app uses an async SQLAlchemy DSN like `postgresql+asyncpg://...`, but `psql` expects a standard Postgres URL like `postgresql://USER:PASSWORD@HOST:5432/postgres`.
+- Apply seed/update files from terminal (idempotent upserts; safe to rerun). Run in numeric order: 001_init, 002_seed_minimal, 003_seed_opening_variants_v1, 004+, etc.
+```bash
+psql "postgresql://USER:PASSWORD@HOST:5432/postgres" -f backend/sql/<file>.sql
+```
+- Opening variants are snapshotted into `game_state` at `ROUND_1_READY`; start a new game after reseeding to see updated openings.
+
 Env files:
 - Default backend env is loaded from `apps/api/.env` (or `ENV_FILE`/`MERCURY_ENV_FILE` if set). Ensure `SUPABASE_DATABASE_URL` is present there.
 - Example from repo root:
