@@ -68,7 +68,73 @@ This preserves realism while enabling distinct negotiation arcs and replayabilit
 
 ---
 
+## Dev Note: CAN Opening Variants (Design Rationale)
 
+Canada’s Top Secret constraints emphasize evidence-based policy, credibility through implementation, and attention to long-range impacts. Within that envelope, the four CAN variants explore different ways Canada can exercise influence through **science, equity, facilitation, and technical credibility**. Variant choice affects whether Canada functions as a driver of ambition, a moral voice, or a stabilizing intermediary.
+
+### CAN_baseline_v1 — *Evidence-Grounded Multilateralist*
+
+**Style:** Calm, analytical, pragmatic
+**Core move:** Anchors negotiation in scientific assessment and shared responsibility
+**Gameplay effect:**
+
+* Establishes a credible, steady tone early
+* Aligns naturally with EU and USA baseline variants
+* Supports movement toward coordinated measures without confrontation
+  **Use when:** You want science-led momentum and low-friction cooperation
+
+---
+
+### CAN_northern_impacts_v2 — *Equity and Exposure Advocate*
+
+**Style:** Empathetic, principled, evidence-driven
+**Core move:** Centers disproportionate impacts on northern and Indigenous communities
+**Gameplay effect:**
+
+* Adds moral weight to atmospheric emission debates
+* Increases pressure on major emitters
+* Strengthens NGO and science-aligned coalitions
+  **Use when:** You want fairness and lived impacts to shape negotiation dynamics
+
+---
+
+### CAN_quiet_broker_v3 — *Consensus Facilitator*
+
+**Style:** Measured, diplomatic, process-oriented
+**Core move:** Builds bridges between polarized positions through process design
+**Gameplay effect:**
+
+* Reduces risk of stalemate or walk-outs
+* Keeps major powers engaged longer
+* Slows escalation in favor of durable agreement
+  **Use when:** You want mediation, trust-building, and incremental convergence
+
+---
+
+### CAN_technical_implementer_v4 — *Compliance Credibility Builder*
+
+**Style:** Practical, institutional, solution-focused
+**Core move:** Shifts debate from ambition to how commitments will actually work
+**Gameplay effect:**
+
+* Elevates monitoring, reporting, and review as negotiation focal points
+* Encourages realistic commitments
+* Supports long-term durability of agreements
+  **Use when:** You want implementation realism and technical design to drive outcomes
+
+---
+
+### Design Principle
+
+Across all variants:
+
+* **Core support for international action remains consistent**
+* **Issue preferences do not change**
+* **Firmness varies to reflect posture, not substance**
+
+The variants do not change what Canada supports. They change **how Canada exerts influence**, and **whether progress flows through evidence, equity, facilitation, or implementation**.
+
+This preserves realism while enabling distinct negotiation arcs and replayability.
 
 ---
 
@@ -226,6 +292,10 @@ The United States’ Top Secret constraints define a clear commitment to interna
 * Aligns quickly with EU-style positions
 * Puts pressure on reluctant parties to justify delay
   **Use when:** You want clear leadership signals and faster convergence toward formal action
+
+---
+
+
 
 ---
 
