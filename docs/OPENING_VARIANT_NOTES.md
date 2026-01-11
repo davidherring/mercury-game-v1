@@ -295,7 +295,73 @@ The United States’ Top Secret constraints define a clear commitment to interna
 
 ---
 
+## Dev Note: TZA Opening Variants (Design Rationale)
 
+Tanzania’s Top Secret constraints emphasize immediate human exposure, development realities, and the central role of artisanal and small-scale gold mining. Within that envelope, the four TZA variants explore different ways Tanzania can exercise influence through **regional coordination, health framing, and equity-based coalition building**. Variant choice shapes whether Tanzania acts primarily as a local-impact advocate or a broader developing-country voice.
+
+### TZA_baseline_v1 — *Community-Centered Pragmatist*
+
+**Style:** Grounded, practical, development-aware
+**Core move:** Frames mercury as a community-level problem requiring feasible, supported solutions
+**Gameplay effect:**
+
+* Centers ASGM exposure early in Round 1
+* Encourages assistance-focused Round 2 conversations
+* Moderates pressure for rapid binding commitments
+  **Use when:** You want negotiations anchored in local realities and immediate harm reduction
+
+---
+
+### TZA_regional_coordinator_v2 — *East Africa Organizer*
+
+**Style:** Cooperative, strategic, regionally focused
+**Core move:** Positions regional coordination as the most effective path to risk reduction
+**Gameplay effect:**
+
+* Promotes bloc-style cooperation among similarly situated countries
+* Elevates training and shared monitoring as negotiation topics
+* Reduces isolation of individual low-capacity states
+  **Use when:** You want regional coalitions and peer learning to drive progress
+
+---
+
+### TZA_health_first_v3 — *Public Health Advocate*
+
+**Style:** Direct, urgent, people-focused
+**Core move:** Prioritizes immediate exposure and health impacts over distant environmental pathways
+**Gameplay effect:**
+
+* Raises moral urgency around ASGM practices
+* Pressures other actors to justify delayed or abstract measures
+* Shifts success metrics toward tangible health outcomes
+  **Use when:** You want health protection and urgency to dominate negotiation logic
+
+---
+
+### TZA_coalition_aligned_advocate_v4 — *Equity and Fairness Champion*
+
+**Style:** Principled, collective, development-oriented
+**Core move:** Aligns with developing-country coalitions to demand differentiated responsibility
+**Gameplay effect:**
+
+* Strengthens South–South alignment
+* Increases leverage in discussions on support and burden sharing
+* Slows agreement unless assistance mechanisms are clarified
+  **Use when:** You want equity and capacity to be central bargaining levers
+
+---
+
+### Design Principle
+
+Across all variants:
+
+* **Primary focus on ASGM-related exposure remains consistent**
+* **Support for international cooperation is preserved**
+* **Firmness varies to reflect framing, not core interests**
+
+The variants do not change Tanzania’s priorities. They change **how Tanzania applies pressure**, and **whether progress flows through health urgency, regional coordination, or coalition politics**.
+
+This ensures replayability while maintaining realism and respect for development constraints.
 
 ---
 
@@ -349,4 +415,7 @@ Across all variants:
 The variants do not change what the United States wants. They change **how the United States leads**, and **what kind of cooperation other players must engage in** to reach agreement.
 
 This supports replayability while maintaining realism and strategic coherence.
+
+---
+
 
