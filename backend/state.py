@@ -70,9 +70,10 @@ def speaker_order_with_constraint(seed: int, human_role_id: Optional[str]) -> Li
 def pick_opening_variant(role_id: str, seed: int, candidates: List[Dict]) -> Dict:
     if not candidates:
         raise ValueError(f"No opening variants available for role {role_id}")
+    ordered = sorted(candidates, key=lambda c: (str(c.get("id")), c.get("opening_text", "")))
     salted_seed = _stable_int(seed, f"opening-{role_id}")
-    idx = salted_seed % len(candidates)
-    return candidates[idx]
+    rng = random.Random(salted_seed)
+    return rng.choice(ordered)
 
 
 __all__ = [

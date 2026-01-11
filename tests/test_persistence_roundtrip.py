@@ -74,6 +74,9 @@ async def test_seeded_content_survives_create_and_round1_ready():
         assert openings, "round1.openings should be populated after ROUND_1_READY"
         sample_opening = next(iter(openings.values()))
         assert sample_opening.get("text"), "Opening text should be non-empty"
+        # Stable within game
+        refreshed = (await client.get(f"/games/{game_id}")).json()["state"].get("round1", {}).get("openings", {})
+        assert openings == refreshed
 
 
 @pytest.mark.asyncio(scope="session")
