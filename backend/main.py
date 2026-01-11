@@ -579,8 +579,6 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 return {"game_id": game_id, "state": state}
 
             speaker_id = order[cursor]
-            if speaker_id == state.get("human_role_id"):
-                raise HTTPException(status_code=400, detail="HUMAN_OPENING_STATEMENT required")
             openings = round1.get("openings", {})
             opening = openings.get(speaker_id)
             if not opening:
@@ -714,7 +712,8 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
         if event in ("CONVO_1_MESSAGE", "CONVO_2_MESSAGE", "CONVO_MESSAGE"):
             if current_status != "ROUND_2_CONVERSATION_ACTIVE":
                 raise HTTPException(status_code=400, detail="CONVO_MESSAGE only allowed in ROUND_2_CONVERSATION_ACTIVE")
-            content = req.payload.get("content")
+            # Tests and UI send message text as "content"; accept "text" as a tolerant fallback.
+            content = req.payload.get("content") or req.payload.get("text")
             if not content:
                 raise HTTPException(status_code=400, detail="content required")
             round2 = state.setdefault("round2", {})
