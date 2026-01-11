@@ -488,4 +488,74 @@ This preserves AMAP’s institutional realism while giving science multiple, mea
 
 ---
 
+## Dev Note: MFF Opening Variants (Design Rationale)
+
+Mercury Free Future’s Top Secret constraints define it as a **normative, advocacy-driven NGO** whose influence comes from moral pressure, clarity of direction, and insistence on outcomes rather than compromise. The four MFF variants explore different ways advocacy can shape negotiations without voting power. Variant choice determines whether MFF accelerates ambition, reframes debates around justice, or exposes weaknesses in proposed agreements.
+
+### MFF_baseline_v1 — *Elimination Advocate*
+
+**Style:** Direct, principled, prevention-focused
+**Core move:** Frames mercury as an avoidable toxin and presses for phase-out
+**Gameplay effect:**
+
+* Establishes a high-ambition reference point early
+* Supports EU and CAN ambition while challenging incrementalism
+* Forces delegates to justify continued mercury use
+  **Use when:** You want clear moral direction and pressure toward elimination
+
+---
+
+### MFF_justice_focused_v2 — *Equity and Human Impact Voice*
+
+**Style:** Moral, people-centered, confrontational
+**Core move:** Centers disproportionate harm to vulnerable communities
+**Gameplay effect:**
+
+* Raises ethical stakes of delay
+* Aligns naturally with TZA and equity-oriented coalitions
+* Makes technocratic arguments feel incomplete
+  **Use when:** You want justice and lived impact to dominate negotiations
+
+---
+
+### MFF_norm_setting_v3 — *Standard Bearer*
+
+**Style:** Strategic, future-oriented, expectation-setting
+**Core move:** Establishes mercury elimination as the emerging global norm
+**Gameplay effect:**
+
+* Shapes long-term framing beyond immediate votes
+* Protects early movers and accelerates market shifts
+* Pressures hesitant actors through reputational signaling
+  **Use when:** You want norms and expectations to drive change
+
+---
+
+### MFF_accountability_pressure_v4 — *Credibility Enforcer*
+
+**Style:** Insistent, skeptical, outcome-focused
+**Core move:** Challenges the gap between commitments and delivery
+**Gameplay effect:**
+
+* Exposes weaknesses in non-binding or vague proposals
+* Raises the cost of symbolic agreements
+* Forces discussion of enforcement and follow-through
+  **Use when:** You want accountability and implementation to be unavoidable
+
+---
+
+### Design Principle
+
+Across all variants:
+
+* **Support for mercury elimination remains constant**
+* **Firmness increases through framing, not issue preference changes**
+* **Influence is exerted through pressure, not negotiation**
+
+The variants do not change what MFF wants. They change **how MFF applies leverage**, and **which weaknesses in the negotiation are made visible**.
+
+This preserves advocacy realism while creating distinct gameplay arcs driven by moral authority, norms, or accountability.
+
+---
+
 
