@@ -579,6 +579,8 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 return {"game_id": game_id, "state": state}
 
             speaker_id = order[cursor]
+            if speaker_id == state.get("human_role_id"):
+                raise HTTPException(status_code=400, detail="HUMAN_OPENING_STATEMENT required")
             openings = round1.get("openings", {})
             opening = openings.get(speaker_id)
             if not opening:
@@ -611,6 +613,50 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 next_status = "ROUND_2_SETUP"
             state["round1"] = round1
             await persist_state(session, game_id, next_status, state, speaker_transcript_id)
+            return {"game_id": game_id, "state": state}
+
+        if event == "HUMAN_OPENING_STATEMENT":
+            if current_status != "ROUND_1_OPENING_STATEMENTS":
+                raise HTTPException(status_code=400, detail="HUMAN_OPENING_STATEMENT only allowed during opening statements")
+            text_payload = req.payload.get("text") if isinstance(req.payload, dict) else None
+            if not text_payload or not str(text_payload).strip():
+                raise HTTPException(status_code=400, detail="text required")
+            round1 = state.get("round1", {})
+            cursor = int(round1.get("cursor", 0))
+            order = round1.get("speaker_order") or []
+            if cursor >= len(order):
+                raise HTTPException(status_code=400, detail="No pending speaker")
+            speaker_id = order[cursor]
+            if speaker_id != state.get("human_role_id"):
+                raise HTTPException(status_code=400, detail="Not human turn")
+
+            japan_intro_template = await fetch_japan_script(session, "R1_CALL_SPEAKER")
+            intro_text = render_script(japan_intro_template, speaker=speaker_id)
+            japan_transcript_id = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=CHAIR,
+                phase="ROUND_1_OPENING_STATEMENTS",
+                content=intro_text,
+                visible_to_human=True,
+                metadata={"cursor": cursor, "index": cursor * 2},
+            )
+            speaker_transcript_id = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=speaker_id,
+                phase="ROUND_1_OPENING_STATEMENTS",
+                content=str(text_payload).strip(),
+                visible_to_human=True,
+                metadata={"cursor": cursor, "index": cursor * 2 + 1},
+            )
+
+            round1["cursor"] = cursor + 1
+            next_status = "ROUND_1_OPENING_STATEMENTS"
+            if round1["cursor"] >= len(order):
+                next_status = "ROUND_2_SETUP"
+            state["round1"] = round1
+            await persist_state(session, game_id, next_status, state, speaker_transcript_id or japan_transcript_id)
             return {"game_id": game_id, "state": state}
 
         # ---- Round 2 setup, partner selection, conversations, wrap-up ----

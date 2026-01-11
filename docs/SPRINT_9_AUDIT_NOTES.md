@@ -52,3 +52,5 @@
 - ISSUE_RESOLUTION mapping corrected: UI now sends `ISSUE_RESOLUTION_CONTINUE` (400 previously complained “ISSUE_RESOLUTION_CONTINUE or ISSUE_DEBATE_STEP required”).
 - ROUND_3_SETUP issue selection now uses dropdown and defaults to the first unresolved issue (no longer read-only on active_issue_index), preventing repeat of issue 1.
 - Transcript display now infers round 1 from phase strings when round field is missing so Round 1 entries render as “round 1”.
+- Round 1 limitation: backend does not expose a human opening statement event; UI shows a dev-only note while using backend-generated placeholders.
+ - Round 1 opening statements now require `HUMAN_OPENING_STATEMENT {text}` when the human is up next; `ROUND_1_STEP` 400s on the human turn.

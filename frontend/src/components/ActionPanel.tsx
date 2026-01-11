@@ -65,6 +65,7 @@ export const ActionPanel: React.FC<Props> = ({
   const [selectedOption, setSelectedOption] = useState<string>("");
   const [debateMessage, setDebateMessage] = useState<string>("");
   const [selectedIssueId, setSelectedIssueId] = useState<string>("");
+  const [humanOpening, setHumanOpening] = useState<string>("");
   const issues: string[] = gameState?.round3?.issues || [];
 
   const roleOptions = useMemo(() => {
@@ -188,10 +189,41 @@ export const ActionPanel: React.FC<Props> = ({
         );
       case "ROUND_1_OPENING_STATEMENTS":
       case "ROUND_1_STEP":
+        // Determine if it is the human's turn based on round1.speaker_order and cursor.
+        const r1 = gameState?.round1 || {};
+        const r1Order: string[] = r1.speaker_order || [];
+        const r1Cursor: number = typeof r1.cursor === "number" ? r1.cursor : 0;
+        const r1Next = r1Order[r1Cursor];
+        const isHumanOpeningTurn = !!humanRoleId && r1Next === humanRoleId;
         return (
-          <button onClick={() => doAdvance("ROUND_1_STEP", {})} style={{ padding: "8px 12px" }}>
-            Next
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {isHumanOpeningTurn ? (
+              <>
+                <label>
+                  Your opening statement:
+                  <textarea
+                    value={humanOpening}
+                    onChange={(e) => setHumanOpening(e.target.value)}
+                    rows={3}
+                    style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+                  />
+                </label>
+                <button
+                  onClick={() =>
+                    doAdvance("HUMAN_OPENING_STATEMENT", { text: humanOpening }).then(() => setHumanOpening(""))
+                  }
+                  disabled={!humanOpening.trim()}
+                  style={{ padding: "8px 12px" }}
+                >
+                  Submit opening
+                </button>
+              </>
+            ) : (
+              <button onClick={() => doAdvance("ROUND_1_STEP", {})} style={{ padding: "8px 12px" }}>
+                Next
+              </button>
+            )}
+          </div>
         );
       case "ROUND_2_SETUP":
         return (
