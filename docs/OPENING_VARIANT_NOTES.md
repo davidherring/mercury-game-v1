@@ -68,4 +68,71 @@ This ensures replayability without breaking realism or balance.
 
 ---
 
+## Dev Note: USA Opening Variants (Design Rationale)
+
+The United States’ Top Secret constraints define a clear commitment to international action while allowing variation in **tone, framing, and leadership posture**. The four USA variants represent distinct diplomatic personas that all support coordinated action, but differ in how they justify, pace, and operationalize it. Variant selection shapes coalition patterns, Round 2 agenda-setting, and perceptions of credibility, even when preferred votes align.
+
+### USA_baseline_v1 — *Confident Multilateral Leader*
+
+**Style:** Direct, confident, science-forward
+**Core move:** Frames mercury as a shared global problem that requires structured international action
+**Gameplay effect:**
+
+* Establishes early momentum toward binding cooperation
+* Aligns quickly with EU-style positions
+* Puts pressure on reluctant parties to justify delay
+  **Use when:** You want clear leadership signals and faster convergence toward formal action
+
+---
+
+### USA_institutional_pragmatist_v2 — *Governance Architect*
+
+**Style:** Procedural, measured, implementation-focused
+**Core move:** Emphasizes credibility, accountability, and institutional design over urgency
+**Gameplay effect:**
+
+* Shifts debate toward mechanisms and compliance
+* Encourages detailed Round 2 discussions on reporting and sequencing
+* Reduces ideological tension without weakening outcomes
+  **Use when:** You want longer, more technical negotiations focused on how agreements work
+
+---
+
+### USA_domestic_realist_v3 — *Durability-Constrained Negotiator*
+
+**Style:** Cautious, grounded, politically aware
+**Core move:** Centers domestic feasibility and long-term sustainability of commitments
+**Gameplay effect:**
+
+* Slows escalation toward rigid obligations
+* Creates space for compromise with China and swing states
+* Forces EU and NGOs to address political constraints explicitly
+  **Use when:** You want feasibility and longevity to dominate the negotiation logic
+
+---
+
+### USA_agenda_setter_v4 — *Forward-Looking Coalition Builder*
+
+**Style:** Optimistic, strategic, outward-facing
+**Core move:** Sets direction by proposing shared goals and practical pathways
+**Gameplay effect:**
+
+* Encourages broad coalitions around framework design
+* Positions the USA as a bridge between ambition and flexibility
+* Accelerates discussions about early wins and capacity building
+  **Use when:** You want proactive agenda-setting and visible progress without overt pressure
+
+---
+
+### Design Principle
+
+Across all variants:
+
+* **Issue preferences remain consistent**
+* **Support for coordinated international action is preserved**
+* **Firmness varies to reflect leadership posture and constraints**
+
+The variants do not change what the United States wants. They change **how the United States leads**, and **what kind of cooperation other players must engage in** to reach agreement.
+
+This supports replayability while maintaining realism and strategic coherence.
 
