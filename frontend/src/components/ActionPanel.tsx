@@ -13,6 +13,7 @@ interface Props {
   onAdvanced: (state?: any) => Promise<void> | void;
   requiredAction?: string | null;
   onClearRequiredAction?: () => void;
+  isAdvancing?: boolean;
 }
 
 const FALLBACK_ROLES = ["BRA", "CAN", "CHN", "EU", "TZA", "USA", "WCPA", "MFF", "AMAP"];
@@ -55,6 +56,7 @@ export const ActionPanel: React.FC<Props> = ({
   onAdvanced,
   requiredAction,
   onClearRequiredAction,
+  isAdvancing = false,
 }) => {
   const [devMode, setDevMode] = useState(false);
   const [rawEvent, setRawEvent] = useState("ROUND_1_READY");
@@ -119,6 +121,7 @@ export const ActionPanel: React.FC<Props> = ({
       onError("No game loaded");
       return;
     }
+    if (isAdvancing) return;
     const { lastRequest, errorMessage, result } = await runRequest({
       method: "POST",
       url: `/games/${gameId}/advance`,
@@ -276,10 +279,17 @@ export const ActionPanel: React.FC<Props> = ({
               onClick={() =>
                 doAdvance("CONVO_1_MESSAGE", { content: message }).then(() => setMessage(""))
               }
-              disabled={!message.trim()}
+              disabled={!message.trim() || isAdvancing}
               style={{ padding: "8px 12px" }}
             >
               Send message
+            </button>
+            <button
+              onClick={() => doAdvance("CONVO_END_EARLY", {})}
+              disabled={isAdvancing}
+              style={{ padding: "8px 12px" }}
+            >
+              End conversation early
             </button>
           </div>
         );

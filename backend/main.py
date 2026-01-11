@@ -821,6 +821,38 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
 
             return {"game_id": game_id, "state": state}
 
+        if event == "CONVO_END_EARLY":
+            if current_status != "ROUND_2_CONVERSATION_ACTIVE":
+                raise HTTPException(status_code=400, detail="CONVO_END_EARLY only allowed in ROUND_2_CONVERSATION_ACTIVE")
+            round2 = state.setdefault("round2", {})
+            active_idx = round2.get("active_convo_index") or 1
+            convo_key = f"convo{active_idx}"
+            convo = round2.get(convo_key)
+            if not convo or convo.get("status") == "CLOSED":
+                raise HTTPException(status_code=400, detail="Conversation is closed")
+            human_role_id = state.get("human_role_id")
+            partner = convo.get("partner_role")
+            if not human_role_id or not partner:
+                raise HTTPException(status_code=400, detail="Conversation not initialized")
+
+            # Only allow on human turn: before the AI reply is sent for a message
+            post_interrupt = bool(convo.get("post_interrupt"))
+            final_human = bool(convo.get("final_human_sent"))
+            final_ai = bool(convo.get("final_ai_sent"))
+            human_turns = int(convo.get("human_turns_used", 0))
+            ai_turns = int(convo.get("ai_turns_used", 0))
+            if post_interrupt and final_human:
+                raise HTTPException(status_code=400, detail="No human turns remaining")
+            if not post_interrupt and human_turns >= 5:
+                raise HTTPException(status_code=400, detail="No human turns remaining")
+
+            convo["status"] = "CLOSED"
+            convo["phase"] = "CLOSED"
+            round2["active_convo_index"] = None
+            next_status = "ROUND_2_SELECT_CONVO_2" if active_idx == 1 else "ROUND_2_WRAP_UP"
+            await persist_state(session, game_id, next_status, state)
+            return {"game_id": game_id, "state": state}
+
         if event == "CONVO_2_SELECTED":
             if current_status != "ROUND_2_SELECT_CONVO_2":
                 raise HTTPException(status_code=400, detail="CONVO_2_SELECTED only allowed from ROUND_2_SELECT_CONVO_2")

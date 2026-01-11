@@ -55,3 +55,4 @@
 - Round 1 opening statements now require `HUMAN_OPENING_STATEMENT {text}` when the human is up next; `ROUND_1_STEP` 400s on the human turn.
 - Round 2 convo2 conclusion sequencing adjusted so “Private negotiations concluded…” is written after the final exchange; new test asserts ordering.
 - ROUND_3_SETUP issue dropdown is now shown only in Dev mode; normal mode displays the next issue as read-only text.
+- New event `CONVO_END_EARLY` ends a Round 2 conversation on the human turn without interrupt/concluded lines (convo1 → SELECT_CONVO_2; convo2 → ROUND_2_WRAP_UP); UI has an end-early button.

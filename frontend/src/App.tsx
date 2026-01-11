@@ -23,6 +23,7 @@ export const App: React.FC = () => {
   const [reviewPayload, setReviewPayload] = useState<any>(null);
   const [loadingReview, setLoadingReview] = useState(false);
   const [requiredAction, setRequiredAction] = useState<string | null>(null);
+  const [isAdvancing, setIsAdvancing] = useState(false);
 
   const refreshAll = async (nextState?: any) => {
     if (nextState && typeof nextState === "object") {
@@ -135,7 +136,11 @@ export const App: React.FC = () => {
             }
             setLastError(msg || undefined);
           }}
-          onAdvanced={(st) => refreshAll(st)}
+          onAdvanced={async (st) => {
+            setIsAdvancing(false);
+            await refreshAll(st);
+          }}
+          isAdvancing={isAdvancing}
           requiredAction={requiredAction}
           onClearRequiredAction={() => persistRequiredAction(gameId, null)}
         />
