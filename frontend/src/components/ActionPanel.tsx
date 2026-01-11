@@ -326,19 +326,21 @@ export const ActionPanel: React.FC<Props> = ({
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div>Next issue: {selectedIssueId || "(unavailable)"}</div>
-            <label>
-              Select issue:
-              <select
-                value={selectedIssueId}
-                onChange={(e) => setSelectedIssueId(e.target.value)}
-                disabled={issues.length === 0}
-                style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
-              >
-                {issues.map((id) => (
-                  <option key={id} value={id}>{id}</option>
-                ))}
-              </select>
-            </label>
+            {devMode && (
+              <label>
+                Select issue (dev override):
+                <select
+                  value={selectedIssueId}
+                  onChange={(e) => setSelectedIssueId(e.target.value)}
+                  disabled={issues.length === 0}
+                  style={{ padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+                >
+                  {issues.map((id) => (
+                    <option key={id} value={id}>{id}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label>
               Human placement:
               <select
