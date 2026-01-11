@@ -68,6 +68,76 @@ This ensures replayability without breaking realism or balance.
 
 ---
 
+## Dev Note: EU Opening Variants (Design Rationale)
+
+The European Union’s Top Secret constraints establish a strong commitment to precautionary action on mercury while allowing variation in **how ambition is expressed, justified, and pursued**. The four EU variants represent distinct diplomatic personas that differ in emphasis on values, governance, urgency, and coalition maintenance. Variant choice shapes pacing, coalition stability, and whether negotiations trend toward convergence or pressure.
+
+### EU_baseline_v1 — *Science-Led Multilateral Advocate*
+
+**Style:** Confident, analytical, consensus-oriented
+**Core move:** Frames mercury as a shared scientific problem requiring coordinated international response
+**Gameplay effect:**
+
+* Aligns naturally with USA leadership variants
+* Applies steady pressure toward binding cooperation
+* Establishes EU as a credibility anchor early in Round 1
+  **Use when:** You want clear scientific framing and steady momentum toward formal action
+
+---
+
+### EU_regulatory_steward_v2 — *Legal and Institutional Architect*
+
+**Style:** Procedural, governance-focused, disciplined
+**Core move:** Emphasizes regulatory coherence, enforceability, and legal integration
+**Gameplay effect:**
+
+* Shifts debate toward framework design and compliance
+* Rewards detailed Round 2 discussions on mechanisms
+* Slows ideological escalation without lowering ambition
+  **Use when:** You want negotiations to hinge on institutional soundness rather than urgency
+
+---
+
+### EU_precautionary_leader_v3 — *Values-Driven Risk Preventer*
+
+**Style:** Normative, health-focused, forward-leaning
+**Core move:** Centers human and ecological protection and argues for early action despite uncertainty
+**Gameplay effect:**
+
+* Raises moral and preventive pressure on hesitant actors
+* Tightens alignment with NGOs and science-forward players
+* Increases tension with sovereignty-focused states
+  **Use when:** You want urgency, ethical framing, and sharper pressure toward strong commitments
+
+---
+
+### EU_consensus_bridge_v4 — *Coalition Maintainer*
+
+**Style:** Pragmatic, inclusive, patient
+**Core move:** Prioritizes broad participation and incremental convergence over immediate ambition
+**Gameplay effect:**
+
+* Reduces risk of deadlock or walk-outs
+* Keeps major emitters engaged longer
+* Delays binding outcomes in favor of trust-building
+  **Use when:** You want stability, gradual progress, and sustained multilateral engagement
+
+---
+
+### Design Principle
+
+Across all variants:
+
+* **Preferred outcomes remain aligned**
+* **Commitment to coordinated action is preserved**
+* **Firmness varies to reflect diplomatic posture and pacing**
+
+The variants do not change what the European Union supports. They change **how the EU applies pressure**, and **whether progress comes through urgency, structure, values, or inclusion**.
+
+This maintains realism while allowing distinct negotiation dynamics and replayability.
+
+---
+
 ## Dev Note: USA Opening Variants (Design Rationale)
 
 The United States’ Top Secret constraints define a clear commitment to international action while allowing variation in **tone, framing, and leadership posture**. The four USA variants represent distinct diplomatic personas that all support coordinated action, but differ in how they justify, pace, and operationalize it. Variant selection shapes coalition patterns, Round 2 agenda-setting, and perceptions of credibility, even when preferred votes align.
