@@ -801,7 +801,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             if interrupt_tid:
                 await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, interrupt_tid)
 
-            if next_status == "ROUND_2_WRAP_UP":
+            if next_status == "ROUND_2_WRAP_UP" and convo.get("status") == "CLOSED" and convo.get("final_ai_sent"):
                 wrap_tid = await insert_transcript_entry(
                     session,
                     game_id,
@@ -810,7 +810,13 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                     content="Private negotiations concluded. Preparing to move to Round 3.",
                     visible_to_human=True,
                     round_number=2,
+                    metadata={
+                        "convo": convo_key,
+                        "index": convo.get("human_turns_used", 0) + convo.get("ai_turns_used", 0) + 1,
+                        "concluded": True,
+                    },
                 )
+                # ensure concluded message is last: write it after final exchange, then persist status
                 await persist_state(session, game_id, "ROUND_2_WRAP_UP", state, wrap_tid)
 
             return {"game_id": game_id, "state": state}
