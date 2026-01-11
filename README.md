@@ -24,7 +24,9 @@ Apply the SQL:
 ```bash
 psql "$DATABASE_URL" -f backend/sql/001_init.sql
 psql "$DATABASE_URL" -f backend/sql/002_seed_minimal.sql
+psql "$DATABASE_URL" -f backend/sql/003_seed_opening_variants_v1.sql
 ```
+Alternatively, you can paste the contents of `backend/sql/003_seed_opening_variants_v1.sql` into the Supabase SQL editor. Openings are snapshotted into `game_state` at `ROUND_1_READY`, so start a new game after reseeding to see updated text.
 
 Run the API:
 ```bash
