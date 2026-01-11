@@ -558,4 +558,71 @@ This preserves advocacy realism while creating distinct gameplay arcs driven by 
 
 ---
 
+## Dev Note: WCPA Opening Variants (Design Rationale)
+
+WCPA’s Top Secret constraints position it as an **industry advocate focused on feasibility, cost, and system stability** rather than denial of environmental harm. The four WCPA variants explore different ways industry influence can shape negotiations without voting power. Variant choice affects whether WCPA slows ambition, redirects it through technology, or reframes risk around energy security.
+
+### WCPA_baseline_v1 — *Incremental Performance Advocate*
+
+**Style:** Pragmatic, operational, solution-oriented
+**Core move:** Emphasizes achievable emission reductions through existing controls
+**Gameplay effect:**
+
+* Grounds discussions in operational feasibility
+* Moderates pressure for rapid structural change
+* Provides technical cover for incremental policies
+  **Use when:** You want industry input to temper ambition without confrontation
+
+---
+
+### WCPA_cost_realist_v2 — *Affordability Defender*
+
+**Style:** Skeptical, cost-focused, proportional
+**Core move:** Challenges high-cost mandates as inefficient and potentially harmful
+**Gameplay effect:**
+
+* Raises resistance to aggressive standards
+* Forces delegates to justify cost-benefit assumptions
+* Strengthens arguments for flexible compliance
+  **Use when:** You want economic constraints to slow or reshape proposals
+
+---
+
+### WCPA_technology_optimist_v3 — *Modernization Champion*
+
+**Style:** Constructive, forward-looking, technical
+**Core move:** Frames innovation as the primary pathway to mercury reduction
+**Gameplay effect:**
+
+* Redirects debate toward technology incentives
+* Supports compromise through upgrade-based solutions
+* Aligns with implementation-focused actors like CAN or AMAP v4
+  **Use when:** You want progress to flow through modernization rather than restriction
+
+---
+
+### WCPA_energy_security_defender_v4 — *System Stability Guardian*
+
+**Style:** Cautious, macro-level, risk-aware
+**Core move:** Frames mercury policy as inseparable from energy reliability
+**Gameplay effect:**
+
+* Elevates system-wide risk in negotiations
+* Raises the perceived cost of aggressive timelines
+* Forces consideration of transition sequencing
+  **Use when:** You want energy security to be a central bargaining constraint
+
+---
+
+### Design Principle
+
+Across all variants:
+
+* **Recognition of mercury risk remains intact**
+* **Opposition targets methods, not goals**
+* **Firmness increases with perceived system threat**
+
+The variants do not change WCPA’s interests. They change **how WCPA defines risk**, and **which tradeoffs delegates must confront**.
+
+This preserves industry realism while ensuring WCPA plays an active, consequential role in shaping outcomes.
 
