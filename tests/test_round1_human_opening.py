@@ -25,14 +25,18 @@ async def test_human_opening_requires_text_and_records_transcript():
 
         # Advance until human turn
         while True:
-          state = (await client.get(f"/games/{game_id}")).json()["state"]
-          cursor = state.get("round1", {}).get("cursor", 0)
-          order = state.get("round1", {}).get("speaker_order", [])
-          if cursor >= len(order):
-            pytest.fail("Ran out of speakers before hitting human turn")
-          next_speaker = order[cursor]
-          if next_speaker == "USA":
-                # ROUND_1_STEP now advances even on human turn; ensure transcript records the opening
+            state = (await client.get(f"/games/{game_id}")).json()["state"]
+            cursor = state.get("round1", {}).get("cursor", 0)
+            order = state.get("round1", {}).get("speaker_order", [])
+            if cursor >= len(order):
+                pytest.fail("Ran out of speakers before hitting human turn")
+            next_speaker = order[cursor]
+            if next_speaker == "USA":
+                openings = state.get("round1", {}).get("openings", {})
+                opening_entry = openings.get("USA", {}) if isinstance(openings, dict) else {}
+                expected_text = opening_entry.get("text") or opening_entry.get("opening_text") or ""
+                expected_snippet = expected_text.strip()[:80].lower() if expected_text else ""
+
                 resp = await client.post(f"/games/{game_id}/advance", json={"event": "ROUND_1_STEP", "payload": {}})
                 resp.raise_for_status()
                 new_state = resp.json()["state"]
@@ -40,8 +44,12 @@ async def test_human_opening_requires_text_and_records_transcript():
 
                 transcript = (await client.get(f"/games/{game_id}/transcript")).json()
                 human_rows = [r for r in transcript if r.get("role_id") == "USA"]
-                assert any("opening" in (r.get("content") or "").lower() or "USA" in (r.get("content") or "") for r in human_rows)
+                assert human_rows
+                if expected_snippet:
+                    assert any(expected_snippet in (r.get("content") or "").lower() for r in human_rows)
+                else:
+                    assert any((r.get("content") or "").strip() for r in human_rows)
                 return
-          else:
+            else:
                 step = await client.post(f"/games/{game_id}/advance", json={"event": "ROUND_1_STEP", "payload": {}})
                 step.raise_for_status()
