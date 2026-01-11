@@ -1,3 +1,77 @@
+## Dev Note: BRA Opening Variants (Design Rationale)
+
+Brazil’s Top Secret constraints emphasize development sensitivity, regional context, and the centrality of artisanal and small-scale gold mining, while still allowing meaningful variation in **framing, coalition strategy, and moral emphasis**. The four BRA variants represent different but credible diplomatic personas that shape how Brazil engages with ambition, equity, and implementation.
+
+### BRA_baseline_v1 — *Pragmatic Development Balancer*
+
+**Style:** Grounded, cooperative, feasibility-focused
+**Core move:** Frames mercury as a local harm requiring practical, capacity-aware solutions
+**Gameplay effect:**
+
+* Positions Brazil as a moderate swing actor
+* Encourages technical and assistance-focused Round 2 discussions
+* Resists premature binding commitments without blocking progress
+  **Use when:** You want steady negotiation with room for compromise and capacity building
+
+---
+
+### BRA_environmental_steward_v2 — *Ecosystem Protector*
+
+**Style:** Normative, ecological, forward-looking
+**Core move:** Elevates biodiversity and environmental resilience as central stakes
+**Gameplay effect:**
+
+* Aligns Brazil more closely with EU and NGO positions
+* Increases pressure for preventative measures
+* Raises the moral cost of inaction for other parties
+  **Use when:** You want environmental urgency and ecosystem framing to shape the debate
+
+---
+
+### BRA_development_first_v3 — *Livelihood Advocate*
+
+**Style:** Cautious, socially grounded, transition-focused
+**Core move:** Centers livelihoods and informal economies in mercury policy
+**Gameplay effect:**
+
+* Slows movement toward restrictive measures
+* Builds affinity with developing country and NGO actors
+* Forces proposals to address social feasibility explicitly
+  **Use when:** You want development constraints and equity to dominate negotiation dynamics
+
+---
+
+### BRA_regional_leader_v4 — *South–South Coordinator*
+
+**Style:** Cooperative, strategic, regionally oriented
+**Core move:** Frames mercury as a regional challenge best addressed through coordination
+**Gameplay effect:**
+
+* Encourages bloc-style diplomacy and regional coalitions
+* Shifts attention to shared monitoring and capacity
+* Positions Brazil as a bridge between global and regional action
+  **Use when:** You want coalition politics and regional frameworks to drive progress
+
+---
+
+### Design Principle
+
+Across all variants:
+
+* **Issue preferences remain consistent**
+* **Support for international cooperation is preserved**
+* **Firmness varies to reflect development priorities and leadership posture**
+
+The variants do not change Brazil’s fundamental interests. They change **how Brazil weighs ambition against feasibility**, and **whether progress flows through ecosystems, livelihoods, or regional leadership**.
+
+This preserves realism while enabling distinct negotiation arcs and replayability.
+
+---
+
+
+
+---
+
 ## Dev Note: CHN Opening Variants (Design Rationale)
 
 China’s Top Secret constraints produce a narrow policy envelope but allow meaningful variation in **tone, emphasis, and negotiation strategy**. The four CHN variants represent different diplomatic personas that are all valid under the same national position. Swapping variants changes coalition dynamics, Round 2 conversations, and perceived legitimacy, even when final vote preferences remain similar.
