@@ -23,6 +23,9 @@ def _default_env_file() -> Path:
 class Settings(BaseSettings):
     database_url: str = Field(default="", validation_alias="SUPABASE_DATABASE_URL")
     app_env: str = Field(default="local", validation_alias="APP_ENV")
+    llm_provider: str | None = Field(default=None, validation_alias="LLM_PROVIDER")
+    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    openai_model: str | None = Field(default=None, validation_alias="OPENAI_MODEL")
 
     model_config = SettingsConfigDict(
         env_file=str(_default_env_file()),
@@ -36,6 +39,8 @@ class Settings(BaseSettings):
                 "SUPABASE_DATABASE_URL is missing. Set it in apps/api/.env or via ENV_FILE/MERCURY_ENV_FILE, "
                 "or export SUPABASE_DATABASE_URL."
             )
+
+        # No validation for optional OpenAI fields; acceptance is enough to avoid extra_forbidden errors
 
 
 @lru_cache()

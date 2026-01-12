@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .ai import FakeLLM, AIResponder
-from .llm_provider import LLMRequest, LLMResponse, get_llm_provider
+from .llm_provider import LLMRequest, LLMResponse, get_llm_provider, validate_llm_response, ValidationError
 from .db import get_session
 from .prompt_builder import build_round2_conversation_prompt
 from .state import (
@@ -814,8 +814,9 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             model_name = getattr(provider, "model_name", "fake")
             try:
                 llm_response = await provider.generate(llm_request)
-            except Exception as e:
-                llm_response = {"assistant_text": "", "metadata": {"error": str(e)}}
+                llm_response = validate_llm_response(llm_response)
+            except ValidationError as e:
+                error_payload = {"error": {"type": "ValidationError", "message": str(e)}}
                 await insert_llm_trace(
                     session,
                     game_id,
@@ -825,9 +826,23 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                     model=model_name,
                     prompt_version=llm_request.get("prompt_version"),
                     request_payload=llm_request.get("request_payload"),
-                    response_payload=dict(llm_response),
+                    response_payload=error_payload,
                 )
-                raise
+                raise HTTPException(status_code=502, detail="LLM response validation failed")
+            except Exception as e:
+                error_payload = {"error": {"type": e.__class__.__name__, "message": str(e)}}
+                await insert_llm_trace(
+                    session,
+                    game_id,
+                    partner,
+                    current_status,
+                    provider=provider_name,
+                    model=model_name,
+                    prompt_version=llm_request.get("prompt_version"),
+                    request_payload=llm_request.get("request_payload"),
+                    response_payload=error_payload,
+                )
+                raise HTTPException(status_code=502, detail="LLM generation failed")
             await insert_llm_trace(
                 session,
                 game_id,

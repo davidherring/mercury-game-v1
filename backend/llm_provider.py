@@ -7,6 +7,10 @@ from .ai import AIResponder, FakeLLM
 from .config import get_settings
 
 
+class ValidationError(Exception):
+    """Raised when an LLM response fails basic structure validation."""
+
+
 class LLMRequest(TypedDict, total=False):
     game_id: str
     role_id: str
@@ -36,6 +40,18 @@ class LLMProvider(Protocol):
         ...
 
 
+def validate_llm_response(resp: Any) -> LLMResponse:
+    if not isinstance(resp, dict):
+        raise ValidationError("LLM response must be a dict")
+    text = resp.get("assistant_text")
+    if not isinstance(text, str):
+        raise ValidationError("assistant_text must be a string")
+    meta = resp.get("metadata")
+    if meta is not None and not isinstance(meta, dict):
+        raise ValidationError("metadata must be a dict or None")
+    return {"assistant_text": text, "metadata": meta}
+
+
 class FakeLLMProvider:
     def __init__(self, responder: Optional[AIResponder] = None) -> None:
         self._responder = responder or FakeLLM()
@@ -61,12 +77,12 @@ def get_llm_provider(app_state: Any) -> LLMProvider:
     if existing:
         return existing
     settings = get_settings()
-    provider_name = (os.environ.get("LLM_PROVIDER") or "").strip().lower()
+    provider_name = (settings.llm_provider or os.environ.get("LLM_PROVIDER") or "").strip().lower()
     if provider_name == "openai":
-        api_key = os.environ.get("OPENAI_API_KEY")
+        api_key = settings.openai_api_key or os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY is required when LLM_PROVIDER=openai")
-        model = os.environ.get("OPENAI_MODEL") or "gpt-5-nano"
+        model = settings.openai_model or os.environ.get("OPENAI_MODEL") or "gpt-5-nano"
         provider = OpenAIProvider(api_key=api_key, model=model)
     else:
         responder = getattr(app_state, "ai_responder", None) or FakeLLM()
@@ -131,4 +147,12 @@ class OpenAIProvider:
         raise RuntimeError(f"OpenAI call failed: {last_error}") if last_error else RuntimeError("OpenAI call failed")
 
 
-__all__ = ["LLMProvider", "LLMRequest", "LLMResponse", "FakeLLMProvider", "OpenAIProvider", "get_llm_provider"]
+__all__ = [
+    "LLMProvider",
+    "LLMRequest",
+    "LLMResponse",
+    "FakeLLMProvider",
+    "OpenAIProvider",
+    "get_llm_provider",
+    "validate_llm_response",
+]
