@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .ai import FakeLLM, AIResponder
+from .llm_provider import LLMRequest, get_llm_provider
 from .db import get_session
 from .state import (
     COUNTRIES,
@@ -755,7 +756,17 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 convo["final_human_sent"] = True
             await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, human_tid)
 
-            reply = await get_ai_responder().respond(content)
+            provider = get_llm_provider(app.state)
+            llm_request: LLMRequest = {
+                "game_id": str(game_id),
+                "role_id": partner,
+                "status": current_status,
+                "prompt_version": "r2_convo_v1",
+                "prompt": content,
+                "conversation_context": {"partner": partner, "convo": convo_key, "human_turns": convo["human_turns_used"], "ai_turns": ai_turns},
+            }
+            llm_response = await provider.generate(llm_request)
+            reply = llm_response.get("assistant_text", "")
             ai_tid = await insert_transcript_entry(
                 session,
                 game_id,

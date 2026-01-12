@@ -73,12 +73,26 @@ async def test_round1_recognize_before_opening():
         # Confirm role and run first opening step
         await client.post(f"/games/{game_id}/advance", json={"event": "ROLE_CONFIRMED", "payload": {"human_role_id": "USA"}})
         await client.post(f"/games/{game_id}/advance", json={"event": "ROUND_1_READY", "payload": {}})
+        # Capture the expected opening text for the next speaker (after first step it should be the first speaker in order)
+        state = (await client.get(f"/games/{game_id}")).json()["state"]
+        cursor = state.get("round1", {}).get("cursor", 0)
+        order = state.get("round1", {}).get("speaker_order", [])
+        assert cursor < len(order)
+        next_speaker = order[cursor]
+        openings = state.get("round1", {}).get("openings", {})
+        opening_entry = openings.get(next_speaker, {}) if isinstance(openings, dict) else {}
+        expected_text = opening_entry.get("text") or opening_entry.get("opening_text") or ""
+        expected_snippet = expected_text.strip()[:80].lower() if expected_text else ""
         await client.post(f"/games/{game_id}/advance", json={"event": "ROUND_1_STEP", "payload": {}})
         resp = await client.get(f"/games/{game_id}/transcript")
         resp.raise_for_status()
         contents = [row["content"] for row in resp.json()]
         recognize_idx = next((i for i, c in enumerate(contents) if "I recognize" in c), None)
-        opening_idx = next((i for i, c in enumerate(contents) if "opening placeholder" in c), None)
+        opening_idx = None
+        if expected_snippet:
+            opening_idx = next((i for i, c in enumerate(contents) if expected_snippet in c.lower()), None)
+        else:
+            opening_idx = next((i for i, c in enumerate(contents) if next_speaker in c), None)
         assert recognize_idx is not None and opening_idx is not None
         assert recognize_idx < opening_idx
 
