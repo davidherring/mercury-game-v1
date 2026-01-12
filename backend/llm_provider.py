@@ -13,6 +13,7 @@ class LLMRequest(TypedDict, total=False):
     prompt_version: str
     conversation_context: Any
     game_state_excerpt: Dict[str, Any]
+    request_payload: Dict[str, Any]
 
 
 class LLMResponse(TypedDict, total=False):

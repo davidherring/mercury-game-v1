@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .ai import FakeLLM, AIResponder
 from .llm_provider import LLMRequest, get_llm_provider
 from .db import get_session
+from .prompt_builder import build_round2_conversation_prompt
 from .state import (
     COUNTRIES,
     VOTE_ORDER,
@@ -246,6 +247,38 @@ async def insert_transcript_entry(
         },
     )
     return uuid.UUID(str(result.scalar_one()))
+
+
+async def insert_llm_trace(
+    session: AsyncSession,
+    game_id: uuid.UUID,
+    role_id: Optional[str],
+    status: str,
+    provider: str,
+    model: Optional[str],
+    prompt_version: Optional[str],
+    request_payload: Optional[Dict[str, Any]],
+    response_payload: Optional[Dict[str, Any]],
+) -> None:
+    await session.execute(
+        text(
+            """
+            INSERT INTO llm_traces
+            (game_id, role_id, status, provider, model, prompt_version, request_payload, response_payload)
+            VALUES (:game_id, :role_id, :status, :provider, :model, :prompt_version, :request_payload, :response_payload)
+            """
+        ),
+        {
+            "game_id": str(game_id),
+            "role_id": role_id,
+            "status": status,
+            "provider": provider,
+            "model": model,
+            "prompt_version": prompt_version,
+            "request_payload": json.dumps(request_payload) if request_payload is not None else None,
+            "response_payload": json.dumps(response_payload) if response_payload is not None else None,
+        },
+    )
 
 
 async def fetch_japan_script(session: AsyncSession, script_key: str) -> Optional[str]:
@@ -757,15 +790,53 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, human_tid)
 
             provider = get_llm_provider(app.state)
+            prompt_payload = build_round2_conversation_prompt(
+                game_id=str(game_id),
+                role_id=partner,
+                status=current_status,
+                human_content=content,
+                partner_role=partner,
+                convo_key=convo_key,
+                human_turns=convo["human_turns_used"],
+                ai_turns=ai_turns,
+            )
             llm_request: LLMRequest = {
                 "game_id": str(game_id),
                 "role_id": partner,
                 "status": current_status,
-                "prompt_version": "r2_convo_v1",
-                "prompt": content,
+                "prompt_version": prompt_payload["prompt_version"],
+                "prompt": prompt_payload["prompt"],
+                "request_payload": prompt_payload.get("request_payload", {}),
                 "conversation_context": {"partner": partner, "convo": convo_key, "human_turns": convo["human_turns_used"], "ai_turns": ai_turns},
             }
-            llm_response = await provider.generate(llm_request)
+            llm_response: Dict[str, Any]
+            try:
+                llm_response = await provider.generate(llm_request)
+            except Exception as e:
+                llm_response = {"assistant_text": "", "metadata": {"error": str(e)}}
+                await insert_llm_trace(
+                    session,
+                    game_id,
+                    partner,
+                    current_status,
+                    provider="fake",
+                    model="fake",
+                    prompt_version=llm_request.get("prompt_version"),
+                    request_payload=llm_request.get("request_payload"),
+                    response_payload=llm_response,
+                )
+                raise
+            await insert_llm_trace(
+                session,
+                game_id,
+                partner,
+                current_status,
+                provider="fake",
+                model="fake",
+                prompt_version=llm_request.get("prompt_version"),
+                request_payload=llm_request.get("request_payload"),
+                response_payload=llm_response,
+            )
             reply = llm_response.get("assistant_text", "")
             ai_tid = await insert_transcript_entry(
                 session,
