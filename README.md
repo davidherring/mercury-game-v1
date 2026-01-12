@@ -127,3 +127,8 @@ curl http://localhost:8000/games/<GAME_ID>/review
   - When `status == ISSUE_RESOLUTION`:
     - `ISSUE_DEBATE_STEP` is allowed and idempotent (ensures the resolution transcript exists; does not advance).
     - `ISSUE_RESOLUTION_CONTINUE` advances to `ROUND_3_SETUP` (if issues remain) or `REVIEW` (when all issues are closed).
+
+### LLM providers (current: FakeLLM; future: OpenAI)
+- Current behavior: all LLM calls use FakeLLM via the provider boundary (`backend/llm_provider.py:get_llm_provider`); prompts are built in `backend/prompt_builder.py`; traces are written to `llm_traces` with provider/model/prompt_version (currently “fake”/“fake”/“r2_convo_v1”).
+- Sprint 13 plan: add a feature flag/env selector (e.g., `LLM_PROVIDER=fake|openai`) and OpenAI credentials (e.g., `OPENAI_API_KEY`) to opt into OpenAI in dev; CI remains on FakeLLM for determinism.
+- Traces will continue to capture provider/model/prompt_version; OpenAI calls will record provider=`openai`, model=<chosen model>, with the same prompt_version and request/response payload shape.
