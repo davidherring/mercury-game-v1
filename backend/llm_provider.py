@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, Optional, Protocol, TypedDict
 
 from .ai import AIResponder, FakeLLM
+from .config import get_settings
 
 
 class LLMRequest(TypedDict, total=False):
@@ -22,8 +24,13 @@ class LLMResponse(TypedDict, total=False):
 
 
 class LLMProvider(Protocol):
-    provider_name: str
-    model_name: Optional[str]
+    @property
+    def provider_name(self) -> str:
+        ...
+
+    @property
+    def model_name(self) -> Optional[str]:
+        ...
 
     async def generate(self, request: LLMRequest) -> LLMResponse:  # pragma: no cover - interface
         ...
@@ -32,8 +39,16 @@ class LLMProvider(Protocol):
 class FakeLLMProvider:
     def __init__(self, responder: Optional[AIResponder] = None) -> None:
         self._responder = responder or FakeLLM()
-        self.provider_name = "fake"
-        self.model_name = "fake"
+        self._provider_name = "fake"
+        self._model_name: Optional[str] = "fake"
+
+    @property
+    def provider_name(self) -> str:
+        return self._provider_name
+
+    @property
+    def model_name(self) -> Optional[str]:
+        return self._model_name
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
         prompt = request.get("prompt") or ""
@@ -45,8 +60,17 @@ def get_llm_provider(app_state: Any) -> LLMProvider:
     existing = getattr(app_state, "llm_provider", None)
     if existing:
         return existing
-    responder = getattr(app_state, "ai_responder", None) or FakeLLM()
-    provider = FakeLLMProvider(responder)
+    settings = get_settings()
+    provider_name = (os.environ.get("LLM_PROVIDER") or "").strip().lower()
+    if provider_name == "openai":
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY is required when LLM_PROVIDER=openai")
+        model = os.environ.get("OPENAI_MODEL") or "gpt-5-nano"
+        provider = OpenAIProvider(api_key=api_key, model=model)
+    else:
+        responder = getattr(app_state, "ai_responder", None) or FakeLLM()
+        provider = FakeLLMProvider(responder)
     setattr(app_state, "llm_provider", provider)
     return provider
 
@@ -54,16 +78,24 @@ def get_llm_provider(app_state: Any) -> LLMProvider:
 class OpenAIProvider:
     def __init__(self, api_key: str, model: str, timeout: float = 30.0, max_retries: int = 2, client: Any = None) -> None:
         self.api_key = api_key
-        self.model_name = model
+        self._model_name: Optional[str] = model
         self.timeout = timeout
         self.max_retries = max_retries
         self._client = client
-        self.provider_name = "openai"
+        self._provider_name = "openai"
+
+    @property
+    def provider_name(self) -> str:
+        return self._provider_name
+
+    @property
+    def model_name(self) -> Optional[str]:
+        return self._model_name
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
         # Lazy import to avoid hard dependency when not used
         try:
-            from openai import OpenAI
+            from openai import OpenAI  # type: ignore
             from openai import APIError  # type: ignore
         except Exception as exc:  # pragma: no cover - optional dependency
             raise RuntimeError("OpenAI client not available") from exc
