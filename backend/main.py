@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .ai import FakeLLM, AIResponder
-from .llm_provider import LLMRequest, get_llm_provider
+from .llm_provider import LLMRequest, LLMResponse, get_llm_provider
 from .db import get_session
 from .prompt_builder import build_round2_conversation_prompt
 from .state import (
@@ -809,7 +809,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 "request_payload": prompt_payload.get("request_payload", {}),
                 "conversation_context": {"partner": partner, "convo": convo_key, "human_turns": convo["human_turns_used"], "ai_turns": ai_turns},
             }
-            llm_response: Dict[str, Any]
+            llm_response: LLMResponse
             try:
                 llm_response = await provider.generate(llm_request)
             except Exception as e:
@@ -823,7 +823,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                     model="fake",
                     prompt_version=llm_request.get("prompt_version"),
                     request_payload=llm_request.get("request_payload"),
-                    response_payload=llm_response,
+                    response_payload=dict(llm_response),
                 )
                 raise
             await insert_llm_trace(
@@ -835,7 +835,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 model="fake",
                 prompt_version=llm_request.get("prompt_version"),
                 request_payload=llm_request.get("request_payload"),
-                response_payload=llm_response,
+                response_payload=dict(llm_response),
             )
             reply = llm_response.get("assistant_text", "")
             ai_tid = await insert_transcript_entry(
