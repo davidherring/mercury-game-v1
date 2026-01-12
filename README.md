@@ -114,6 +114,16 @@ python -m pytest -q -x tests/test_canaries_round3.py
 Note on AI code generation environments
 Some AI code generation environments cannot reach your database and therefore cannot run DB-backed tests. Treat any “tests failed due to DB connectivity” notes as non-authoritative unless the exact pytest command output is included. The source of truth for test status is the local pytest output shown above.
 
+### LLM Providers (Round 2)
+- Default: FakeLLM (deterministic, no network). This is always used unless explicitly enabled.
+- Enable OpenAI locally (Round 2 private conversations only):
+  - `LLM_PROVIDER=openai`
+  - `OPENAI_API_KEY=...`
+  - `OPENAI_MODEL=...` (optional; current default is `gpt-5-nano`)
+- Tracing: every Round 2 LLM call writes `llm_traces` with `provider`, `model`, `prompt_version` (`r2_convo_v1`), and request/response payloads. Example query:
+  - `SELECT provider, model, prompt_version, request_payload, response_payload FROM llm_traces WHERE game_id = '<id>';`
+- CI/tests: run with FakeLLM only. Do not set `OPENAI_API_KEY` or `LLM_PROVIDER=openai` in CI. OpenAI behavior is covered via stubs/monkeypatch; no network calls occur in tests.
+
 ### Review (end-of-game payload)
 - Endpoint: `GET /games/{game_id}/review`
 - Returns:
