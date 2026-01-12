@@ -22,6 +22,9 @@ class LLMResponse(TypedDict, total=False):
 
 
 class LLMProvider(Protocol):
+    provider_name: str
+    model_name: Optional[str]
+
     async def generate(self, request: LLMRequest) -> LLMResponse:  # pragma: no cover - interface
         ...
 
@@ -29,6 +32,8 @@ class LLMProvider(Protocol):
 class FakeLLMProvider:
     def __init__(self, responder: Optional[AIResponder] = None) -> None:
         self._responder = responder or FakeLLM()
+        self.provider_name = "fake"
+        self.model_name = "fake"
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
         prompt = request.get("prompt") or ""
@@ -46,4 +51,52 @@ def get_llm_provider(app_state: Any) -> LLMProvider:
     return provider
 
 
-__all__ = ["LLMProvider", "LLMRequest", "LLMResponse", "FakeLLMProvider", "get_llm_provider"]
+class OpenAIProvider:
+    def __init__(self, api_key: str, model: str, timeout: float = 30.0, max_retries: int = 2, client: Any = None) -> None:
+        self.api_key = api_key
+        self.model_name = model
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self._client = client
+        self.provider_name = "openai"
+
+    async def generate(self, request: LLMRequest) -> LLMResponse:
+        # Lazy import to avoid hard dependency when not used
+        try:
+            from openai import OpenAI
+            from openai import APIError  # type: ignore
+        except Exception as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError("OpenAI client not available") from exc
+
+        client = self._client or OpenAI(api_key=self.api_key, timeout=self.timeout)
+        prompt = request.get("prompt") or ""
+        last_error: Optional[Exception] = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                # Use Responses API if available; fall back to chat completions if not.
+                if hasattr(client, "responses"):
+                    resp = await client.responses.create(  # type: ignore[attr-defined]
+                        model=self.model_name,
+                        input=prompt,
+                    )
+                    content = getattr(resp, "output_text", None) or ""
+                else:
+                    chat = await client.chat.completions.create(  # type: ignore[attr-defined]
+                        model=self.model_name,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    content = chat.choices[0].message.content if chat.choices else ""
+                return {"assistant_text": content or "", "metadata": {"provider": "openai", "model": self.model_name}}
+            except Exception as exc:  # pragma: no cover - best effort retry
+                last_error = exc
+                if attempt >= self.max_retries:
+                    break
+                if isinstance(exc, (TimeoutError,)):
+                    continue
+                if "rate" in str(exc).lower() or "timeout" in str(exc).lower():
+                    continue
+                break
+        raise RuntimeError(f"OpenAI call failed: {last_error}") if last_error else RuntimeError("OpenAI call failed")
+
+
+__all__ = ["LLMProvider", "LLMRequest", "LLMResponse", "FakeLLMProvider", "OpenAIProvider", "get_llm_provider"]

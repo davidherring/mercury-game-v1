@@ -810,6 +810,8 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 "conversation_context": {"partner": partner, "convo": convo_key, "human_turns": convo["human_turns_used"], "ai_turns": ai_turns},
             }
             llm_response: LLMResponse
+            provider_name = getattr(provider, "provider_name", "fake")
+            model_name = getattr(provider, "model_name", "fake")
             try:
                 llm_response = await provider.generate(llm_request)
             except Exception as e:
@@ -819,8 +821,8 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                     game_id,
                     partner,
                     current_status,
-                    provider="fake",
-                    model="fake",
+                    provider=provider_name,
+                    model=model_name,
                     prompt_version=llm_request.get("prompt_version"),
                     request_payload=llm_request.get("request_payload"),
                     response_payload=dict(llm_response),
@@ -831,8 +833,8 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 game_id,
                 partner,
                 current_status,
-                provider="fake",
-                model="fake",
+                provider=provider_name,
+                model=model_name,
                 prompt_version=llm_request.get("prompt_version"),
                 request_payload=llm_request.get("request_payload"),
                 response_payload=dict(llm_response),
