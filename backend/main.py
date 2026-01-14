@@ -6,6 +6,7 @@ import hashlib
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -524,11 +525,235 @@ async def create_game(req: CreateGameRequest, session: AsyncSession = Depends(ge
 
 @app.post("/games/{game_id}/advance", response_model=GameResponse)
 async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSession = Depends(get_session)):
+    event = req.event
+    if event in ("CONVO_1_MESSAGE", "CONVO_2_MESSAGE", "CONVO_MESSAGE"):
+        # Phase 1: commit the human message and state update.
+        async with session.begin():
+            game = await fetch_game_with_state(session, game_id)
+            state = game["state"]
+            current_status = game["status"]
+            if current_status != "ROUND_2_CONVERSATION_ACTIVE":
+                raise HTTPException(status_code=400, detail="CONVO_MESSAGE only allowed in ROUND_2_CONVERSATION_ACTIVE")
+            # Tests and UI send message text as "content"; accept "text" as a tolerant fallback.
+            content = req.payload.get("content") or req.payload.get("text")
+            if not content:
+                raise HTTPException(status_code=400, detail="content required")
+            round2 = state.setdefault("round2", {})
+            active_idx = round2.get("active_convo_index") or 1
+            convo_key = f"convo{active_idx}"
+            convo = round2.get(convo_key)
+            if not convo or convo.get("status") == "CLOSED":
+                raise HTTPException(status_code=400, detail="Conversation is closed")
+            human_role_id = state.get("human_role_id")
+            partner = convo.get("partner_role")
+            if not human_role_id or not partner:
+                raise HTTPException(status_code=400, detail="Conversation not initialized")
+
+            post_interrupt = bool(convo.get("post_interrupt"))
+            final_human = bool(convo.get("final_human_sent"))
+            human_turns = int(convo.get("human_turns_used", 0))
+            ai_turns = int(convo.get("ai_turns_used", 0))
+
+            if post_interrupt:
+                if final_human:
+                    raise HTTPException(status_code=400, detail="No human turns remaining")
+            else:
+                if human_turns >= 5:
+                    raise HTTPException(status_code=400, detail="No human turns remaining")
+
+            human_tid = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=human_role_id,
+                phase="ROUND_2",
+                content=content,
+                visible_to_human=True,
+                round_number=2,
+                metadata={"partner": partner, "sender": "human", "index": human_turns * 2, "convo": convo_key},
+            )
+            convo["human_turns_used"] = human_turns + 1
+            if post_interrupt:
+                convo["final_human_sent"] = True
+            await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, human_tid)
+
+            partner_role = partner
+            convo_key_local = convo_key
+            human_turns_used = convo["human_turns_used"]
+            ai_turns_used = ai_turns
+            current_status_local = current_status
+
+        provider = get_llm_provider(app.state)
+        prompt_payload = build_round2_conversation_prompt(
+            game_id=str(game_id),
+            role_id=partner_role,
+            status=current_status_local,
+            human_content=content,
+            partner_role=partner_role,
+            convo_key=convo_key_local,
+            human_turns=human_turns_used,
+            ai_turns=ai_turns_used,
+        )
+        llm_request: LLMRequest = {
+            "game_id": str(game_id),
+            "role_id": partner_role,
+            "status": current_status_local,
+            "prompt_version": prompt_payload["prompt_version"],
+            "prompt": prompt_payload["prompt"],
+            "request_payload": prompt_payload.get("request_payload", {}),
+            "conversation_context": {
+                "partner": partner_role,
+                "convo": convo_key_local,
+                "human_turns": human_turns_used,
+                "ai_turns": ai_turns_used,
+            },
+        }
+        provider_name = getattr(provider, "provider_name", "fake")
+        model_name = getattr(provider, "model_name", "fake")
+        try:
+            llm_response = await provider.generate(llm_request)
+            llm_response = validate_llm_response(llm_response)
+        except ValidationError as e:
+            error_payload = {"error": {"type": "ValidationError", "message": str(e)}}
+            if provider_name == "openai":
+                error_payload["error_type"] = e.__class__.__name__
+                error_payload["error_message"] = str(e)
+            async with session.begin():
+                await insert_llm_trace(
+                    session,
+                    game_id,
+                    partner_role,
+                    current_status_local,
+                    provider=provider_name,
+                    model=model_name,
+                    prompt_version=llm_request.get("prompt_version"),
+                    request_payload=llm_request.get("request_payload"),
+                    response_payload=error_payload,
+                )
+            if provider_name == "openai":
+                return JSONResponse(status_code=502, content={"detail": "LLM response validation failed"})
+            raise HTTPException(status_code=502, detail="LLM response validation failed")
+        except Exception as e:
+            error_payload = {"error": {"type": e.__class__.__name__, "message": str(e)}}
+            if provider_name == "openai":
+                error_payload["error_type"] = e.__class__.__name__
+                error_payload["error_message"] = str(e)
+            async with session.begin():
+                await insert_llm_trace(
+                    session,
+                    game_id,
+                    partner_role,
+                    current_status_local,
+                    provider=provider_name,
+                    model=model_name,
+                    prompt_version=llm_request.get("prompt_version"),
+                    request_payload=llm_request.get("request_payload"),
+                    response_payload=error_payload,
+                )
+            if provider_name == "openai":
+                return JSONResponse(status_code=502, content={"detail": "LLM generation failed"})
+            raise HTTPException(status_code=502, detail="LLM generation failed")
+
+        success_state: Optional[Dict[str, Any]] = None
+        async with session.begin():
+            game = await fetch_game_with_state(session, game_id)
+            state = game["state"]
+            current_status = game["status"]
+            round2 = state.setdefault("round2", {})
+            active_idx = round2.get("active_convo_index") or 1
+            convo_key = f"convo{active_idx}"
+            convo = round2.get(convo_key)
+            if not convo or convo.get("status") == "CLOSED":
+                raise HTTPException(status_code=400, detail="Conversation is closed")
+            human_role_id = state.get("human_role_id")
+            partner = convo.get("partner_role")
+            if not human_role_id or not partner:
+                raise HTTPException(status_code=400, detail="Conversation not initialized")
+
+            post_interrupt = bool(convo.get("post_interrupt"))
+            ai_turns = int(convo.get("ai_turns_used", 0))
+
+            await insert_llm_trace(
+                session,
+                game_id,
+                partner,
+                current_status,
+                provider=provider_name,
+                model=model_name,
+                prompt_version=llm_request.get("prompt_version"),
+                request_payload=llm_request.get("request_payload"),
+                response_payload=dict(llm_response),
+            )
+            reply = llm_response.get("assistant_text", "")
+            ai_tid = await insert_transcript_entry(
+                session,
+                game_id,
+                role_id=partner,
+                phase="ROUND_2",
+                content=reply,
+                visible_to_human=True,
+                round_number=2,
+                metadata={"partner": human_role_id, "sender": "ai", "index": ai_turns * 2 + 1, "convo": convo_key},
+            )
+            convo["ai_turns_used"] = ai_turns + 1
+            if post_interrupt:
+                convo["final_ai_sent"] = True
+
+            next_status = "ROUND_2_CONVERSATION_ACTIVE"
+            interrupt_tid = None
+            if not post_interrupt and convo["human_turns_used"] >= 5 and convo["ai_turns_used"] >= 5:
+                interrupt_tid = await insert_transcript_entry(
+                    session,
+                    game_id,
+                    role_id=CHAIR,
+                    phase="ROUND_2",
+                    content="The Chair interrupts. Please move to final statements.",
+                    visible_to_human=True,
+                    round_number=2,
+                    metadata={"interrupt": True, "convo": convo_key, "index": convo["human_turns_used"] + convo["ai_turns_used"]},
+                )
+                convo["post_interrupt"] = True
+                convo["phase"] = "POST_INTERRUPT"
+
+            if convo.get("post_interrupt") and convo.get("final_human_sent") and convo.get("final_ai_sent"):
+                convo["status"] = "CLOSED"
+                convo["phase"] = "CLOSED"
+                round2["active_convo_index"] = None
+                if active_idx == 1:
+                    next_status = "ROUND_2_SELECT_CONVO_2"
+                else:
+                    next_status = "ROUND_2_WRAP_UP"
+
+            await persist_state(session, game_id, next_status, state, ai_tid)
+
+            if interrupt_tid:
+                await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, interrupt_tid)
+
+            if next_status == "ROUND_2_WRAP_UP" and convo.get("status") == "CLOSED" and convo.get("final_ai_sent"):
+                wrap_tid = await insert_transcript_entry(
+                    session,
+                    game_id,
+                    role_id=CHAIR,
+                    phase="ROUND_2",
+                    content="Private negotiations concluded. Preparing to move to Round 3.",
+                    visible_to_human=True,
+                    round_number=2,
+                    metadata={
+                        "convo": convo_key,
+                        "index": convo.get("human_turns_used", 0) + convo.get("ai_turns_used", 0) + 1,
+                        "concluded": True,
+                    },
+                )
+                # ensure concluded message is last: write it after final exchange, then persist status
+                await persist_state(session, game_id, "ROUND_2_WRAP_UP", state, wrap_tid)
+
+            success_state = state
+
+        return {"game_id": game_id, "state": success_state}
+
     async with session.begin():
         game = await fetch_game_with_state(session, game_id)
         state = game["state"]
         current_status = game["status"]
-        event = req.event
 
         if event == "ROLE_CONFIRMED":
             if current_status != "ROLE_SELECTION":
@@ -741,182 +966,6 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 metadata={"partner": partner},
             )
             await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, transcript_id)
-            return {"game_id": game_id, "state": state}
-
-        if event in ("CONVO_1_MESSAGE", "CONVO_2_MESSAGE", "CONVO_MESSAGE"):
-            if current_status != "ROUND_2_CONVERSATION_ACTIVE":
-                raise HTTPException(status_code=400, detail="CONVO_MESSAGE only allowed in ROUND_2_CONVERSATION_ACTIVE")
-            # Tests and UI send message text as "content"; accept "text" as a tolerant fallback.
-            content = req.payload.get("content") or req.payload.get("text")
-            if not content:
-                raise HTTPException(status_code=400, detail="content required")
-            round2 = state.setdefault("round2", {})
-            active_idx = round2.get("active_convo_index") or 1
-            convo_key = f"convo{active_idx}"
-            convo = round2.get(convo_key)
-            if not convo or convo.get("status") == "CLOSED":
-                raise HTTPException(status_code=400, detail="Conversation is closed")
-            human_role_id = state.get("human_role_id")
-            partner = convo.get("partner_role")
-            if not human_role_id or not partner:
-                raise HTTPException(status_code=400, detail="Conversation not initialized")
-
-            post_interrupt = bool(convo.get("post_interrupt"))
-            final_human = bool(convo.get("final_human_sent"))
-            final_ai = bool(convo.get("final_ai_sent"))
-            human_turns = int(convo.get("human_turns_used", 0))
-            ai_turns = int(convo.get("ai_turns_used", 0))
-
-            if post_interrupt:
-                if final_human:
-                    raise HTTPException(status_code=400, detail="No human turns remaining")
-            else:
-                if human_turns >= 5:
-                    raise HTTPException(status_code=400, detail="No human turns remaining")
-
-            human_tid = await insert_transcript_entry(
-                session,
-                game_id,
-                role_id=human_role_id,
-                phase="ROUND_2",
-                content=content,
-                visible_to_human=True,
-                round_number=2,
-                metadata={"partner": partner, "sender": "human", "index": human_turns * 2, "convo": convo_key},
-            )
-            convo["human_turns_used"] = human_turns + 1
-            if post_interrupt:
-                convo["final_human_sent"] = True
-            await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, human_tid)
-
-            provider = get_llm_provider(app.state)
-            prompt_payload = build_round2_conversation_prompt(
-                game_id=str(game_id),
-                role_id=partner,
-                status=current_status,
-                human_content=content,
-                partner_role=partner,
-                convo_key=convo_key,
-                human_turns=convo["human_turns_used"],
-                ai_turns=ai_turns,
-            )
-            llm_request: LLMRequest = {
-                "game_id": str(game_id),
-                "role_id": partner,
-                "status": current_status,
-                "prompt_version": prompt_payload["prompt_version"],
-                "prompt": prompt_payload["prompt"],
-                "request_payload": prompt_payload.get("request_payload", {}),
-                "conversation_context": {"partner": partner, "convo": convo_key, "human_turns": convo["human_turns_used"], "ai_turns": ai_turns},
-            }
-            llm_response: LLMResponse
-            provider_name = getattr(provider, "provider_name", "fake")
-            model_name = getattr(provider, "model_name", "fake")
-            try:
-                llm_response = await provider.generate(llm_request)
-                llm_response = validate_llm_response(llm_response)
-            except ValidationError as e:
-                error_payload = {"error": {"type": "ValidationError", "message": str(e)}}
-                await insert_llm_trace(
-                    session,
-                    game_id,
-                    partner,
-                    current_status,
-                    provider=provider_name,
-                    model=model_name,
-                    prompt_version=llm_request.get("prompt_version"),
-                    request_payload=llm_request.get("request_payload"),
-                    response_payload=error_payload,
-                )
-                raise HTTPException(status_code=502, detail="LLM response validation failed")
-            except Exception as e:
-                error_payload = {"error": {"type": e.__class__.__name__, "message": str(e)}}
-                await insert_llm_trace(
-                    session,
-                    game_id,
-                    partner,
-                    current_status,
-                    provider=provider_name,
-                    model=model_name,
-                    prompt_version=llm_request.get("prompt_version"),
-                    request_payload=llm_request.get("request_payload"),
-                    response_payload=error_payload,
-                )
-                raise HTTPException(status_code=502, detail="LLM generation failed")
-            await insert_llm_trace(
-                session,
-                game_id,
-                partner,
-                current_status,
-                provider=provider_name,
-                model=model_name,
-                prompt_version=llm_request.get("prompt_version"),
-                request_payload=llm_request.get("request_payload"),
-                response_payload=dict(llm_response),
-            )
-            reply = llm_response.get("assistant_text", "")
-            ai_tid = await insert_transcript_entry(
-                session,
-                game_id,
-                role_id=partner,
-                phase="ROUND_2",
-                content=reply,
-                visible_to_human=True,
-                round_number=2,
-                metadata={"partner": human_role_id, "sender": "ai", "index": ai_turns * 2 + 1, "convo": convo_key},
-            )
-            convo["ai_turns_used"] = ai_turns + 1
-            if post_interrupt:
-                convo["final_ai_sent"] = True
-
-            next_status = "ROUND_2_CONVERSATION_ACTIVE"
-            interrupt_tid = None
-            if not post_interrupt and convo["human_turns_used"] >= 5 and convo["ai_turns_used"] >= 5:
-                interrupt_tid = await insert_transcript_entry(
-                    session,
-                    game_id,
-                    role_id=CHAIR,
-                    phase="ROUND_2",
-                    content="The Chair interrupts. Please move to final statements.",
-                    visible_to_human=True,
-                    round_number=2,
-                    metadata={"interrupt": True, "convo": convo_key, "index": convo["human_turns_used"] + convo["ai_turns_used"]},
-                )
-                convo["post_interrupt"] = True
-                convo["phase"] = "POST_INTERRUPT"
-
-            if convo.get("post_interrupt") and convo.get("final_human_sent") and convo.get("final_ai_sent"):
-                convo["status"] = "CLOSED"
-                convo["phase"] = "CLOSED"
-                round2["active_convo_index"] = None
-                if active_idx == 1:
-                    next_status = "ROUND_2_SELECT_CONVO_2"
-                else:
-                    next_status = "ROUND_2_WRAP_UP"
-
-            await persist_state(session, game_id, next_status, state, ai_tid)
-
-            if interrupt_tid:
-                await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, interrupt_tid)
-
-            if next_status == "ROUND_2_WRAP_UP" and convo.get("status") == "CLOSED" and convo.get("final_ai_sent"):
-                wrap_tid = await insert_transcript_entry(
-                    session,
-                    game_id,
-                    role_id=CHAIR,
-                    phase="ROUND_2",
-                    content="Private negotiations concluded. Preparing to move to Round 3.",
-                    visible_to_human=True,
-                    round_number=2,
-                    metadata={
-                        "convo": convo_key,
-                        "index": convo.get("human_turns_used", 0) + convo.get("ai_turns_used", 0) + 1,
-                        "concluded": True,
-                    },
-                )
-                # ensure concluded message is last: write it after final exchange, then persist status
-                await persist_state(session, game_id, "ROUND_2_WRAP_UP", state, wrap_tid)
-
             return {"game_id": game_id, "state": state}
 
         if event == "CONVO_END_EARLY":

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Dict, Optional, Protocol, TypedDict
 
 from .ai import AIResponder, FakeLLM
 from .config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class ValidationError(Exception):
@@ -77,17 +80,36 @@ def get_llm_provider(app_state: Any) -> LLMProvider:
     if existing:
         return existing
 
-    responder = getattr(app_state, "ai_responder", None) or FakeLLM()
-    provider = FakeLLMProvider(responder)
+    settings = get_settings()
+    provider_choice = (settings.llm_provider or "").lower()
+    if provider_choice == "openai" and settings.openai_api_key:
+        provider = OpenAIProvider(api_key=settings.openai_api_key, model=DEFAULT_OPENAI_MODEL)
+    else:
+        responder = getattr(app_state, "ai_responder", None) or FakeLLM()
+        provider = FakeLLMProvider(responder)
+
+    if settings.app_env == "local":
+        logger.info(
+            "LLM provider selected",
+            extra={
+                "llm_provider_env": os.getenv("LLM_PROVIDER"),
+                "provider_name": getattr(provider, "provider_name", None),
+                "model_name": getattr(provider, "model_name", None),
+            },
+        )
 
     setattr(app_state, "llm_provider", provider)
     return provider
 
 
+DEFAULT_OPENAI_MODEL = "gpt-5-nano"
+
+
 class OpenAIProvider:
     def __init__(self, api_key: str, model: str, timeout: float = 30.0, max_retries: int = 2, client: Any = None) -> None:
         self.api_key = api_key
-        self._model_name: Optional[str] = model
+        # Hard-locked model for Sprint 15; ignore env-provided variants.
+        self._model_name: Optional[str] = DEFAULT_OPENAI_MODEL
         self.timeout = timeout
         self.max_retries = max_retries
         self._client = client
@@ -104,30 +126,36 @@ class OpenAIProvider:
     async def generate(self, request: LLMRequest) -> LLMResponse:
         # Lazy import to avoid hard dependency when not used
         try:
-            from openai import OpenAI  # type: ignore
-            from openai import APIError  # type: ignore
+            from openai import AsyncOpenAI  # type: ignore
         except Exception as exc:  # pragma: no cover - optional dependency
             raise RuntimeError("OpenAI client not available") from exc
 
-        client = self._client or OpenAI(api_key=self.api_key, timeout=self.timeout)
         prompt = request.get("prompt") or ""
         last_error: Optional[Exception] = None
         for attempt in range(self.max_retries + 1):
             try:
-                # Use Responses API if available; fall back to chat completions if not.
-                if hasattr(client, "responses"):
-                    resp = await client.responses.create(  # type: ignore[attr-defined]
-                        model=self.model_name,
-                        input=prompt,
-                    )
-                    content = getattr(resp, "output_text", None) or ""
+                if callable(self._client):
+                    content = await self._client(prompt)
                 else:
-                    chat = await client.chat.completions.create(  # type: ignore[attr-defined]
-                        model=self.model_name,
-                        messages=[{"role": "user", "content": prompt}],
-                    )
-                    content = chat.choices[0].message.content if chat.choices else ""
+                    client = self._client or AsyncOpenAI(api_key=self.api_key, timeout=self.timeout)
+                    # Use Responses API if available; fall back to chat completions if not.
+                    if hasattr(client, "responses"):
+                        resp = await client.responses.create(  # type: ignore[attr-defined]
+                            model=self.model_name,
+                            input=prompt,
+                        )
+                        content = getattr(resp, "output_text", None) or ""
+                    else:
+                        chat = await client.chat.completions.create(  # type: ignore[attr-defined]
+                            model=self.model_name,
+                            messages=[{"role": "user", "content": prompt}],
+                        )
+                        content = chat.choices[0].message.content if chat.choices else ""
+                if not isinstance(content, str) or not content.strip():
+                    raise ValidationError("OpenAI response was empty")
                 return {"assistant_text": content or "", "metadata": {"provider": "openai", "model": self.model_name}}
+            except ValidationError:
+                raise
             except Exception as exc:  # pragma: no cover - best effort retry
                 last_error = exc
                 if attempt >= self.max_retries:
@@ -145,6 +173,7 @@ __all__ = [
     "LLMRequest",
     "LLMResponse",
     "FakeLLMProvider",
+    "DEFAULT_OPENAI_MODEL",
     "OpenAIProvider",
     "get_llm_provider",
     "validate_llm_response",

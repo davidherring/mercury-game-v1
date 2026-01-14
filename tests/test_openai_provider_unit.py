@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 
-from backend.llm_provider import OpenAIProvider, ValidationError
+from backend.llm_provider import OpenAIProvider, ValidationError, DEFAULT_OPENAI_MODEL
 
 
 @pytest.mark.asyncio
@@ -13,7 +13,7 @@ async def test_openai_provider_success_stub():
     resp = await provider.generate({"prompt": "hello"})
     assert resp["assistant_text"] == "stubbed:hello"
     assert resp["metadata"]["provider"] == "openai"
-    assert resp["metadata"]["model"] == "stub-model"
+    assert resp["metadata"]["model"] == DEFAULT_OPENAI_MODEL
 
 
 @pytest.mark.asyncio
