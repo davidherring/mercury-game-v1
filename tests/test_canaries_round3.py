@@ -36,7 +36,7 @@ async def _vote_sequence_for_issue(session: AsyncSession, game_id: str, issue_id
     return [r[0] for r in rows.fetchall()]
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_vote_order_and_resolution_semantics():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()
@@ -86,7 +86,7 @@ async def test_vote_order_and_resolution_semantics():
         assert vote_sequence == list(VOTE_ORDER)
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_checkpoints_follow_transcripts():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()

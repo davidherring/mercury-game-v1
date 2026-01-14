@@ -46,7 +46,7 @@ async def _reach_issue_debate(client: AsyncClient, human_placement: str = "skip"
     return game_id
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_full_debate_progression_all_ai():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()
@@ -92,7 +92,7 @@ async def test_full_debate_progression_all_ai():
         assert c_after - c_before == len(queue1) + len(queue2)
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_human_turn_requires_explicit_message():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()

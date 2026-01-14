@@ -37,7 +37,7 @@ async def _prepare_game_with_seed(client: AsyncClient, seed: int, human_role: st
     return {"id": game_id, "state": get_resp.json()["state"]}
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_deterministic_speaker_order_and_openings():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -78,7 +78,7 @@ async def test_deterministic_speaker_order_and_openings():
         assert s1_open == s2_open
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_human_not_first_in_subgroup():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

@@ -88,7 +88,7 @@ async def _run_issue_to_resolution(
     return game_id, final_state, len(queue1), len(queue2)
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "issue_id,expected_options",
     [
@@ -123,7 +123,7 @@ async def test_issues_2_4_full_run(issue_id: str, expected_options: List[str]):
         assert c_total <= t_total
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_proposal_tie_break_lowest_option_id():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()

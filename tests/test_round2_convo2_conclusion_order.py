@@ -33,7 +33,7 @@ async def _complete_convo(client: AsyncClient, game_id: str, event_name: str):
     await _advance(client, game_id, event_name, {"content": "m6"})
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_convo2_conclusion_happens_after_final_exchange():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

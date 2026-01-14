@@ -11,7 +11,7 @@ from backend.main import app
 from backend.db import get_session
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_transcript_empty_returns_list():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -24,7 +24,7 @@ async def test_transcript_empty_returns_list():
         assert resp.json() == []
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_transcript_filtering_and_ordering():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

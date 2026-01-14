@@ -29,7 +29,7 @@ async def _prepare_round1_openings(client: AsyncClient) -> str:
     return game_id
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_round1_step_adds_two_transcripts_and_checkpoint():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -64,7 +64,7 @@ async def test_round1_step_adds_two_transcripts_and_checkpoint():
         assert checkpoints_after - checkpoints_before == 1
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_round1_full_progression_reaches_round2_setup():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

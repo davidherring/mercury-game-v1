@@ -41,7 +41,7 @@ async def _reach_round3_setup(client: AsyncClient) -> str:
     return game_id
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_round3_issue_intro_sets_active_issue_and_transcript():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -82,7 +82,7 @@ async def test_round3_issue_intro_sets_active_issue_and_transcript():
         assert last["phase"] == "ISSUE_INTRO"
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_issue_intro_continue_moves_to_debate_queue():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

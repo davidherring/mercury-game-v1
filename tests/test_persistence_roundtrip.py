@@ -59,7 +59,8 @@ def _choose_partner_ids(roles: dict, human_role: str) -> list[str]:
     return countries + non_countries
 
 
-@pytest.mark.asyncio(scope="session")
+# @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_seeded_content_survives_create_and_round1_ready():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -79,7 +80,8 @@ async def test_seeded_content_survives_create_and_round1_ready():
         assert openings == refreshed
 
 
-@pytest.mark.asyncio(scope="session")
+# @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_transcript_persists_round1_to_round2_boundary():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -109,7 +111,8 @@ async def _play_to_review(client: AsyncClient, game_id: str, roles: dict, human_
     await _advance(client, game_id, "ROUND_2_WRAP_READY", {})
 
 
-@pytest.mark.asyncio(scope="session")
+# @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_full_playthrough_review_contains_votes():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

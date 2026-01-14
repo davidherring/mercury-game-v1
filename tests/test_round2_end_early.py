@@ -24,7 +24,7 @@ async def _fast_forward_round1(client: AsyncClient, game_id: str):
             await _advance(client, game_id, "ROUND_1_STEP", {})
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_end_convo1_early_transitions_to_convo2_select():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -44,7 +44,7 @@ async def test_end_convo1_early_transitions_to_convo2_select():
         assert not any("Private negotiations concluded" in c for c in contents)
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_end_convo2_early_transitions_to_wrap_up():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

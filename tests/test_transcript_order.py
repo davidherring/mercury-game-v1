@@ -12,7 +12,7 @@ from backend.db import get_session
 from backend.main import app
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_transcript_order_stable_by_index_and_id():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()
@@ -62,7 +62,7 @@ async def test_transcript_order_stable_by_index_and_id():
         assert [row["content"] for row in data] == ["msg0", "msg1"]
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_round1_recognize_before_opening():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()
@@ -97,7 +97,7 @@ async def test_round1_recognize_before_opening():
         assert recognize_idx < opening_idx
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_round2_human_before_ai():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()

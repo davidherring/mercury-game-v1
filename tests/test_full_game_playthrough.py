@@ -59,7 +59,7 @@ async def _round_counts(session: AsyncSession, game_id: str) -> Dict[int, int]:
     return {int(row[0]): row[1] for row in res}
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_full_game_playthrough():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()

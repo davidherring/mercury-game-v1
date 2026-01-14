@@ -14,7 +14,7 @@ async def _count(session: AsyncSession, table: str, game_id: str) -> int:
     return res.scalar_one()
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "issue_id,expected_option_ids",
     [

@@ -67,7 +67,7 @@ async def _advance_issue_in_place(client: AsyncClient, game_id: str, issue_id: s
     return state
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_game_reaches_review_and_review_payload():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()

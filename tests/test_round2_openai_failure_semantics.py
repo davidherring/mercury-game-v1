@@ -32,7 +32,7 @@ def _reset_provider_cache() -> None:
     get_settings.cache_clear()
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_round2_openai_failure_semantics(monkeypatch: pytest.MonkeyPatch):
     _reset_provider_cache()
     monkeypatch.setenv("LLM_PROVIDER", "openai")

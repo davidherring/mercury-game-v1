@@ -40,7 +40,7 @@ async def _reach_convo2_select(client: AsyncClient) -> str:
     return game_id
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_skip_convo2():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -73,7 +73,7 @@ async def test_skip_convo2():
         assert "skipped" in last["content"].lower()
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_select_convo2_and_progression():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()
@@ -145,7 +145,7 @@ async def test_select_convo2_and_progression():
         assert blocked.status_code == 400
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_wrap_up_to_round3_setup():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -176,7 +176,7 @@ async def test_wrap_up_to_round3_setup():
         assert c_after - c_before == 1
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_convo2_partner_validation():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

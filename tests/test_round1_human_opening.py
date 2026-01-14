@@ -12,7 +12,7 @@ async def _count(session: AsyncSession, table: str, game_id: str) -> int:
     return res.scalar_one()
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_human_opening_requires_text_and_records_transcript():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

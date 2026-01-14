@@ -46,7 +46,7 @@ async def _count_checkpoints(session: AsyncSession, game_id: str) -> int:
     return res.scalar_one()
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_round2_ready_writes_transcript_and_checkpoint():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -82,7 +82,7 @@ async def test_round2_ready_writes_transcript_and_checkpoint():
         assert last["visible_to_human"] is True
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_convo1_selection_writes_transcript_and_checkpoint():
     transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

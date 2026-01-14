@@ -32,7 +32,8 @@ def _reset_provider_cache() -> None:
     get_settings.cache_clear()
 
 
-@pytest.mark.asyncio(scope="session")
+# @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_round2_llm_writes_trace_row():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()
@@ -106,7 +107,8 @@ def test_provider_selection_openai(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.mark.skip(reason="OpenAI provider selection is disabled in Sprint 14 (FakeLLM-only)")
-@pytest.mark.asyncio(scope="session")
+# @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_round2_llm_trace_openai_stub(monkeypatch: pytest.MonkeyPatch):
     _reset_provider_cache()
     monkeypatch.setenv("LLM_PROVIDER", "openai")

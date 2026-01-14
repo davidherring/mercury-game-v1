@@ -45,7 +45,7 @@ async def _prepare_convo_active(client: AsyncClient) -> str:
     return game_id
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_conversation_progression_and_checkpoints():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()
@@ -79,7 +79,7 @@ async def test_conversation_progression_and_checkpoints():
         assert c_after - c_before == 11
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_interrupt_and_final_closure():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()

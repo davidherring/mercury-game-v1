@@ -77,7 +77,7 @@ async def _reach_position_finalization(client: AsyncClient, human_role: str = "A
     return game_id
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_full_issue1_ai_votes_and_resolution():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()
@@ -129,7 +129,7 @@ async def test_full_issue1_ai_votes_and_resolution():
         assert c_after - c_before == 8
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_human_vote_required():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()
@@ -177,7 +177,7 @@ async def test_human_vote_required():
             idx += 1
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_issue1_determinism():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()

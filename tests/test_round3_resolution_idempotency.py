@@ -69,7 +69,7 @@ async def _reach_issue_resolution(client: AsyncClient) -> Tuple[str, dict]:
     return game_id, res_state
 
 
-@pytest.mark.asyncio(scope="session")
+@pytest.mark.asyncio
 async def test_resolution_transcript_idempotent_and_continue_transition():
     transport = ASGITransport(app=cast(Any, app))
     app.state.ai_responder = FakeLLM()
