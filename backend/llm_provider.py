@@ -76,17 +76,10 @@ def get_llm_provider(app_state: Any) -> LLMProvider:
     existing = getattr(app_state, "llm_provider", None)
     if existing:
         return existing
-    settings = get_settings()
-    provider_name = (settings.llm_provider or os.environ.get("LLM_PROVIDER") or "").strip().lower()
-    if provider_name == "openai":
-        api_key = settings.openai_api_key or os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY is required when LLM_PROVIDER=openai")
-        model = settings.openai_model or os.environ.get("OPENAI_MODEL") or "gpt-5-nano"
-        provider = OpenAIProvider(api_key=api_key, model=model)
-    else:
-        responder = getattr(app_state, "ai_responder", None) or FakeLLM()
-        provider = FakeLLMProvider(responder)
+
+    responder = getattr(app_state, "ai_responder", None) or FakeLLM()
+    provider = FakeLLMProvider(responder)
+
     setattr(app_state, "llm_provider", provider)
     return provider
 
