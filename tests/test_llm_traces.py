@@ -87,6 +87,7 @@ async def test_round2_llm_writes_trace_row():
         assert resp_payload.get("assistant_text") == ai_content
 
 
+@pytest.mark.skip(reason="OpenAI provider selection is disabled in Sprint 14 (FakeLLM-only)")
 def test_provider_selection_openai(monkeypatch: pytest.MonkeyPatch):
     _reset_provider_cache()
     monkeypatch.setenv("LLM_PROVIDER", "openai")
@@ -104,6 +105,7 @@ def test_provider_selection_openai(monkeypatch: pytest.MonkeyPatch):
     assert isinstance(provider2, FakeLLMProvider)
 
 
+@pytest.mark.skip(reason="OpenAI provider selection is disabled in Sprint 14 (FakeLLM-only)")
 @pytest.mark.asyncio(scope="session")
 async def test_round2_llm_trace_openai_stub(monkeypatch: pytest.MonkeyPatch):
     _reset_provider_cache()
