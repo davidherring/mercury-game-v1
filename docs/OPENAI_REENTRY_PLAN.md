@@ -12,7 +12,7 @@ OpenAI Re-entry Plan — 2026-01-13
 
 ## Configuration rules (strict)
 - Default behavior: system must boot and tests must pass with FakeLLM even if OpenAI-related env vars exist.
-- OpenAI enablement: OpenAI is enabled only via a single, centralized switch (choose one: LLM_PROVIDER=openai or explicit injection), evaluated only in backend/llm_provider.py:get_llm_provider.
+- OpenAI enablement: OpenAI is enabled only via a single, centralized switch (LLM_PROVIDER=openai), evaluated only in backend/llm_provider.py:get_llm_provider.
 - Settings parsing: Settings must not hard-fail on “extra” env keys. If strict validation is kept, OpenAI-related keys must be explicitly modeled as optional fields so they don’t crash the app when present.
 - Required keys: OPENAI_API_KEY is required only when OpenAI is enabled; otherwise ignored.
 - Caching discipline: tests that modify env must clear get_settings() cache (e.g., reset_settings_cache() if present) and clear any provider cache on app.state to prevent cross-test contamination.
@@ -22,7 +22,7 @@ OpenAI Re-entry Plan — 2026-01-13
 - Tests remain deterministic: default provider remains FakeLLM; tests never call network. Add one stubbed provider test in `tests/test_llm_traces.py::test_openai_wiring_stub` that injects a deterministic StubOpenAIProvider (implements the LLMProvider protocol) and asserts request shape + llm_traces provider/model/prompt_version fields. No network calls.
 
 ## Rollback strategy
-- Disable OpenAI by unsetting `LLM_PROVIDER` (defaults to FakeLLM). If any 502s appear in canary tests, trace write missing on error, or transcript ordering regressions occur, revert to FakeLLM-only selection in `get_llm_provider`.
+- Disable OpenAI by switching provider selection back to FakeLLM-only at backend/llm_provider.py:get_llm_provider (in Sprint 15 we may reintroduce LLM_PROVIDER; if so, rollback is unsetting it).
 
 ## Checklist
 - [ ] Gate OpenAI-specific tests behind an explicit opt-in flag so FakeLLM-only CI remains green.
