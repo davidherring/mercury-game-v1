@@ -1,3 +1,4 @@
+import json
 import pytest
 from typing import Any, cast
 from httpx import ASGITransport, AsyncClient
@@ -24,6 +25,17 @@ async def _fetch_llm_traces(session: AsyncSession, game_id: str) -> list[dict[st
         {"gid": game_id},
     )
     return [dict(row._mapping) for row in rows]
+
+
+def _normalize_payload(payload: Any) -> dict[str, Any]:
+    if isinstance(payload, dict):
+        return payload
+    if isinstance(payload, str):
+        try:
+            return cast(dict[str, Any], json.loads(payload))
+        except json.JSONDecodeError:
+            return {}
+    return {}
 
 
 def _reset_provider_cache() -> None:
@@ -81,9 +93,36 @@ async def test_round2_llm_writes_trace_row():
         trace = traces[-1]
         assert trace["provider"] == "fake"
         assert trace["model"] == "fake"
-        assert trace["prompt_version"] == "r2_convo_v1"
-        req_payload = trace.get("request_payload") or {}
+        assert trace["prompt_version"] == "r2_convo_v3"
+        req_payload = _normalize_payload(trace.get("request_payload"))
         assert test_msg in (req_payload.get("prompt") or "")
+        assert "Role: You are" in (req_payload.get("prompt") or "")
+        context = _normalize_payload(req_payload.get("context"))
+        openings = _normalize_payload(context.get("openings"))
+        partner_opening = _normalize_payload(openings.get("partner_opening"))
+        assert partner_opening.get("initial_stances") is not None
+        assert partner_opening.get("conversation_interests") is not None
+        human_opening = openings.get("human_opening_text")
+        assert isinstance(human_opening, str)
+        assert human_opening.strip()
+        transcript_tail = context.get("transcript_tail") or []
+        assert isinstance(transcript_tail, list)
+        assert len(transcript_tail) <= 10
+        assert isinstance(transcript_tail[-1], dict)
+        # Request-time snapshot: tail ends with the human message before AI generation.
+        assert transcript_tail[-1].get("content") == test_msg
+        assert transcript_tail[-1].get("role_id") == "USA"
+        issues = context.get("issues") or []
+        assert isinstance(issues, list)
+        assert issues
+        issue = issues[0]
+        assert isinstance(issue, dict)
+        assert issue.get("issue_id")
+        assert issue.get("title")
+        assert isinstance(issue.get("options"), list)
+        if issue.get("options"):
+            option = issue["options"][0]
+            assert "short_description" not in option
         resp_payload = trace.get("response_payload") or {}
         assert resp_payload.get("assistant_text") == ai_content
 
@@ -160,7 +199,7 @@ async def test_round2_llm_trace_openai_stub(monkeypatch: pytest.MonkeyPatch):
         trace = traces[-1]
         assert trace["provider"] == "openai"
         assert trace["model"] == "stub-model"
-        assert trace["prompt_version"] == "r2_convo_v1"
+        assert trace["prompt_version"] == "r2_convo_v3"
         resp_payload = trace.get("response_payload") or {}
         assert resp_payload.get("assistant_text") == ai_content
 

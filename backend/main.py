@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .ai import FakeLLM, AIResponder
 from .llm_provider import LLMRequest, LLMResponse, get_llm_provider, validate_llm_response, ValidationError
 from .db import get_session
-from .prompt_builder import build_round2_conversation_prompt
+from .prompt_builder import build_round2_conversation_prompt, build_round2_context
 from .state import (
     COUNTRIES,
     VOTE_ORDER,
@@ -53,6 +53,9 @@ class ReviewResponse(BaseModel):
 
 def utc_iso() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+ROUND2_TRANSCRIPT_TAIL_LIMIT = 10
 
 
 async def get_or_create_user(session: AsyncSession, user_id: Optional[uuid.UUID]) -> uuid.UUID:
@@ -94,6 +97,85 @@ async def fetch_game_with_state(session: AsyncSession, game_id: uuid.UUID) -> Di
         "human_role_id": row["human_role_id"],
         "state": state,
     }
+
+
+async def fetch_round2_transcript_tail(
+    session: AsyncSession,
+    game_id: uuid.UUID,
+    convo_key: str,
+    limit: int = ROUND2_TRANSCRIPT_TAIL_LIMIT,
+) -> List[Dict[str, Any]]:
+    rows = await session.execute(
+        text(
+            """
+            SELECT role_id, phase, round, issue_id, content, metadata
+            FROM transcript_entries
+            WHERE game_id = :gid
+              AND phase = 'ROUND_2'
+              AND COALESCE(metadata->>'convo', '') = :convo
+            ORDER BY
+              COALESCE((metadata->>'index')::int, 2147483647) DESC,
+              created_at DESC,
+              id DESC
+            LIMIT :limit
+            """
+        ),
+        {"gid": str(game_id), "convo": convo_key, "limit": int(limit)},
+    )
+    tail = [dict(row._mapping) for row in rows]
+    tail.reverse()
+    return tail
+
+
+async def fetch_human_opening_text(
+    session: AsyncSession,
+    game_id: uuid.UUID,
+    human_role_id: str,
+) -> Optional[str]:
+    row = await session.execute(
+        text(
+            """
+            SELECT content
+            FROM transcript_entries
+            WHERE game_id = :gid
+              AND phase = 'ROUND_1_OPENING_STATEMENTS'
+              AND role_id = :rid
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """
+        ),
+        {"gid": str(game_id), "rid": human_role_id},
+    )
+    result = row.scalar_one_or_none()
+    return str(result) if result else None
+
+
+async def fetch_issue_definitions(session: AsyncSession) -> List[Dict[str, Any]]:
+    rows = await session.execute(
+        text(
+            """
+            SELECT id, title, description, options
+            FROM issue_definitions
+            ORDER BY id ASC
+            """
+        )
+    )
+    issues: List[Dict[str, Any]] = []
+    for row in rows.mappings():
+        options = row["options"]
+        if isinstance(options, str):
+            options = json.loads(options)
+        if isinstance(options, list):
+            options = sorted(options, key=lambda opt: opt.get("option_id"))
+        issues.append(
+            {
+                "issue_id": str(row["id"]),
+                "title": row["title"],
+                "description": row["description"],
+                "options": options,
+            }
+        )
+    return issues
 
 
 async def persist_state(
@@ -583,6 +665,21 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             current_status_local = current_status
 
         provider = get_llm_provider(app.state)
+        partner_opening = state.get("round1", {}).get("openings", {}).get(partner_role)
+        async with session.begin():
+            human_opening_text = await fetch_human_opening_text(session, game_id, human_role_id)
+            transcript_tail = await fetch_round2_transcript_tail(session, game_id, convo_key_local)
+            issues = await fetch_issue_definitions(session)
+        round2_context = build_round2_context(
+            game_id=str(game_id),
+            active_convo_index=active_idx,
+            active_convo=convo,
+            partner_role=partner_role,
+            partner_opening=partner_opening,
+            human_opening_text=human_opening_text,
+            transcript_tail=transcript_tail,
+            issues=issues,
+        )
         prompt_payload = build_round2_conversation_prompt(
             game_id=str(game_id),
             role_id=partner_role,
@@ -592,6 +689,8 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             convo_key=convo_key_local,
             human_turns=human_turns_used,
             ai_turns=ai_turns_used,
+            human_role=human_role_id,
+            context=round2_context,
         )
         llm_request: LLMRequest = {
             "game_id": str(game_id),
@@ -788,7 +887,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             variants_rows = await session.execute(
                 text(
                     """
-                    SELECT id, role_id, opening_text, initial_stances
+                    SELECT id, role_id, opening_text, initial_stances, conversation_interests
                     FROM opening_variants
                     ORDER BY role_id ASC, id ASC
                     """
@@ -802,6 +901,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                         "role_id": row["role_id"],
                         "opening_text": row["opening_text"],
                         "initial_stances": row.get("initial_stances"),
+                        "conversation_interests": row.get("conversation_interests"),
                     }
                 )
 
@@ -810,7 +910,12 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 if role_id == CHAIR:
                     continue
                 chosen = pick_opening_variant(role_id, seed, openings_by_role.get(role_id, []))
-                openings[role_id] = {"variant_id": chosen["id"], "text": chosen["opening_text"]}
+                openings[role_id] = {
+                    "variant_id": chosen["id"],
+                    "text": chosen["opening_text"],
+                    "initial_stances": chosen.get("initial_stances"),
+                    "conversation_interests": chosen.get("conversation_interests"),
+                }
             state["round1"]["openings"] = openings
 
             japan_open_template = await fetch_japan_script(session, "R1_OPEN")

@@ -53,16 +53,31 @@ async def test_convo2_conclusion_happens_after_final_exchange():
 
         transcript = (await client.get(f"/games/{game_id}/transcript")).json()
         contents = [row.get("content") or "" for row in transcript]
+        convo2_rows = [
+            (i, row)
+            for i, row in enumerate(transcript)
+            if row.get("phase") == "ROUND_2"
+            and isinstance(row.get("metadata"), dict)
+            and row.get("metadata", {}).get("convo") == "convo2"
+        ]
 
         try:
             idx_concluded = max(i for i, c in enumerate(contents) if "Private negotiations concluded" in c)
         except ValueError:
             pytest.fail("Concluded line not found in transcript")
         try:
-            idx_final_human = max(i for i, c in enumerate(contents) if c.strip() == "m6")
-            idx_final_ai = max(i for i, c in enumerate(contents) if "[FAKE_RESPONSE]m6" in c)
+            idx_final_human = max(
+                i
+                for i, row in convo2_rows
+                if row.get("role_id") == "USA" and (row.get("content") or "").strip() == "m6"
+            )
+            # FakeLLM output may change when prompt format changes; find the next AI row in convo2.
+            idx_final_ai = min(
+                i
+                for i, row in convo2_rows
+                if i > idx_final_human and row.get("role_id") == "MFF"
+            )
         except ValueError:
             pytest.fail("Final exchange rows not found")
 
-        assert idx_final_human < idx_concluded
-        assert idx_final_ai < idx_concluded
+        assert idx_final_human < idx_final_ai < idx_concluded
