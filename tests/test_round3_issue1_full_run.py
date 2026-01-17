@@ -14,6 +14,15 @@ async def _count(session: AsyncSession, table: str, game_id: str) -> int:
     return res.scalar_one()
 
 
+async def _with_session(fn):
+    agen = get_session()
+    session: AsyncSession = await agen.__anext__()
+    try:
+        return await fn(session)
+    finally:
+        await agen.aclose()
+
+
 async def _reach_position_finalization(client: AsyncClient, human_role: str = "AMAP", human_placement: str = "skip", seed: int = 12345) -> str:
     # Note: Japan (JPN) cannot be chosen as human. Using NGO default keeps debate AI-only when placement is skip.
     # human_placement="skip" prevents HUMAN_DEBATE_MESSAGE requirements unless explicitly testing human debate turns.
@@ -21,11 +30,11 @@ async def _reach_position_finalization(client: AsyncClient, human_role: str = "A
     assert create_resp.status_code == 200
     game_id = create_resp.json()["game_id"]
     # Set deterministic seed
-    async for session in get_session():
-        assert isinstance(session, AsyncSession)
+    async def _set_seed(session: AsyncSession):
         async with session.begin():
             await session.execute(text("UPDATE games SET seed = :seed WHERE id = :gid"), {"seed": seed, "gid": game_id})
-        break
+
+    await _with_session(_set_seed)
     resp = await client.post(f"/games/{game_id}/advance", json={"event": "ROLE_CONFIRMED", "payload": {"human_role_id": human_role}})
     assert resp.status_code == 200
     r1_ready = await client.post(f"/games/{game_id}/advance", json={"event": "ROUND_1_READY", "payload": {}})
@@ -87,12 +96,12 @@ async def test_full_issue1_ai_votes_and_resolution():
         state = (await client.get(f"/games/{game_id}")).json()["state"]
         assert state["status"] == "ISSUE_POSITION_FINALIZATION"
 
-        t_before = c_before = 0
-        async for session in get_session():
-            assert isinstance(session, AsyncSession)
+        async def _read_before(session: AsyncSession):
             t_before = await _count(session, "transcript_entries", game_id)
             c_before = await _count(session, "checkpoints", game_id)
-            break
+            return t_before, c_before
+
+        t_before, c_before = await _with_session(_read_before)
 
         # Proposal selection
         prop_resp = await client.post(f"/games/{game_id}/advance", json={"event": "ISSUE_DEBATE_STEP", "payload": {}})
@@ -117,12 +126,12 @@ async def test_full_issue1_ai_votes_and_resolution():
         votes = final_state["round3"]["active_issue"]["votes"]
         assert len(votes) == 6
 
-        t_after = c_after = 0
-        async for session in get_session():
-            assert isinstance(session, AsyncSession)
+        async def _read_after(session: AsyncSession):
             t_after = await _count(session, "transcript_entries", game_id)
             c_after = await _count(session, "checkpoints", game_id)
-            break
+            return t_after, c_after
+
+        t_after, c_after = await _with_session(_read_after)
 
         # deltas: +1 proposal +6 votes +1 resolution
         assert t_after - t_before == 8
@@ -148,12 +157,12 @@ async def test_human_vote_required():
             order = ai["vote_order"]
             cur = ai["next_voter_index"]
             voter = order[cur]
-            t_before = c_before = 0
-            async for session in get_session():
-                assert isinstance(session, AsyncSession)
+            async def _read_before(session: AsyncSession):
                 t_before = await _count(session, "transcript_entries", game_id)
                 c_before = await _count(session, "checkpoints", game_id)
-                break
+                return t_before, c_before
+
+            t_before, c_before = await _with_session(_read_before)
             if voter == "USA":
                 bad = await client.post(f"/games/{game_id}/advance", json={"event": "ISSUE_DEBATE_STEP", "payload": {}})
                 assert bad.status_code == 400
@@ -162,12 +171,12 @@ async def test_human_vote_required():
                     json={"event": "HUMAN_VOTE", "payload": {"vote": "YES"}},
                 )
                 assert good.status_code == 200
-                t_after = c_after = 0
-                async for session in get_session():
-                    assert isinstance(session, AsyncSession)
+                async def _read_after(session: AsyncSession):
                     t_after = await _count(session, "transcript_entries", game_id)
                     c_after = await _count(session, "checkpoints", game_id)
-                    break
+                    return t_after, c_after
+
+                t_after, c_after = await _with_session(_read_after)
                 assert t_after - t_before == 1
                 assert c_after - c_before == 1
                 break
