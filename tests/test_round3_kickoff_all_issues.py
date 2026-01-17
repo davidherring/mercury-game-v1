@@ -14,6 +14,15 @@ async def _count(session: AsyncSession, table: str, game_id: str) -> int:
     return res.scalar_one()
 
 
+async def _with_session(fn):
+    agen = get_session()
+    session: AsyncSession = await agen.__anext__()
+    try:
+        return await fn(session)
+    finally:
+        await agen.aclose()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "issue_id,expected_option_ids",
@@ -29,12 +38,12 @@ async def test_round3_intro_all_issues(issue_id: str, expected_option_ids: list[
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         game_id = await _reach_round3_setup(client)
 
-        t_before = c_before = 0
-        async for session in get_session():
-            assert isinstance(session, AsyncSession)
+        async def _read_before(session: AsyncSession):
             t_before = await _count(session, "transcript_entries", game_id)
             c_before = await _count(session, "checkpoints", game_id)
-            break
+            return t_before, c_before
+
+        t_before, c_before = await _with_session(_read_before)
 
         resp = await client.post(
             f"/games/{game_id}/advance",
@@ -49,12 +58,12 @@ async def test_round3_intro_all_issues(issue_id: str, expected_option_ids: list[
         for oid in expected_option_ids:
             assert oid in option_ids
 
-        t_after = c_after = 0
-        async for session in get_session():
-            assert isinstance(session, AsyncSession)
+        async def _read_after(session: AsyncSession):
             t_after = await _count(session, "transcript_entries", game_id)
             c_after = await _count(session, "checkpoints", game_id)
-            break
+            return t_after, c_after
+
+        t_after, c_after = await _with_session(_read_after)
 
         assert t_after - t_before == 1
         assert c_after - c_before == 1
@@ -68,14 +77,14 @@ async def test_round3_intro_all_issues(issue_id: str, expected_option_ids: list[
         new_tid = last["id"]
 
         # Checkpoint tied to this transcript
-        async for session in get_session():
-            assert isinstance(session, AsyncSession)
+        async def _fetch_checkpoint(session: AsyncSession):
             cp = await session.execute(
                 text(
                     "SELECT id, created_at FROM checkpoints WHERE game_id = :gid AND transcript_entry_id = :tid LIMIT 1"
                 ),
                 {"gid": game_id, "tid": new_tid},
             )
-            row = cp.first()
-            assert row is not None
-            break
+            return cp.first()
+
+        row = await _with_session(_fetch_checkpoint)
+        assert row is not None
