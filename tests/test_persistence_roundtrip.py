@@ -1,10 +1,12 @@
+from typing import Any, Optional, cast
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from backend.main import app
 
 
-async def _advance(client: AsyncClient, game_id: str, event: str, payload: dict = None):
+async def _advance(client: AsyncClient, game_id: str, event: str, payload: Optional[dict[str, Any]] = None):
     payload = payload or {}
     resp = await client.post(f"/games/{game_id}/advance", json={"event": event, "payload": payload})
     if resp.status_code >= 400:
@@ -62,7 +64,7 @@ def _choose_partner_ids(roles: dict, human_role: str) -> list[str]:
 # @pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_seeded_content_survives_create_and_round1_ready():
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         game_id = (await client.post("/games", json={})).json()["game_id"]
         state = (await client.get(f"/games/{game_id}")).json()["state"]
@@ -83,7 +85,7 @@ async def test_seeded_content_survives_create_and_round1_ready():
 # @pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_transcript_persists_round1_to_round2_boundary():
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         game_id, state, _roles, _human = await _reach_round2_setup(client)
         # Should be at ROUND_2_SETUP
@@ -114,7 +116,7 @@ async def _play_to_review(client: AsyncClient, game_id: str, roles: dict, human_
 # @pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_full_playthrough_review_contains_votes():
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         game_id, state, roles, human_role = await _reach_round2_setup(client)
         await _play_to_review(client, game_id, roles, human_role)

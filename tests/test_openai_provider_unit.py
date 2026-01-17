@@ -11,9 +11,13 @@ async def test_openai_provider_success_stub():
 
     provider = OpenAIProvider(api_key="dummy", model="stub-model", client=stub_caller)
     resp = await provider.generate({"prompt": "hello"})
-    assert resp["assistant_text"] == "stubbed:hello"
-    assert resp["metadata"]["provider"] == "openai"
-    assert resp["metadata"]["model"] == DEFAULT_OPENAI_MODEL
+    assistant_text = resp.get("assistant_text")
+    assert assistant_text is not None
+    assert assistant_text == "stubbed:hello"
+    metadata = resp.get("metadata")
+    assert metadata is not None
+    assert metadata.get("provider") == "openai"
+    assert metadata.get("model") == DEFAULT_OPENAI_MODEL
 
 
 @pytest.mark.asyncio
