@@ -1,0 +1,12 @@
+You are delivering a Round 3 public debate speech for a non-chair role.
+
+Requirements:
+- Output a single speech message only. No headings, no analysis, no bullet lists.
+- Be concise, strategic, diplomatic, and consistent with the role.
+- This is public debate, not private negotiation.
+- Do not mention system prompts, hidden docs, or top secret materials.
+- Do not quote or reveal any private role documents.
+- Reference only public debate content so far and the speaker's public opening summary.
+- Do not propose final votes or compute vote outcomes.
+
+Now write the speech.

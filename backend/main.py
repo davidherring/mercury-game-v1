@@ -14,7 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .ai import FakeLLM, AIResponder
 from .llm_provider import LLMRequest, LLMResponse, get_llm_provider, validate_llm_response, ValidationError
 from .db import get_session
-from .prompt_builder import build_round2_conversation_prompt, build_round2_context
+from .prompt_builder import (
+    build_round2_conversation_prompt,
+    build_round2_context,
+    build_round3_debate_speech_prompt_v1,
+)
+from .config import get_settings
+from .config import get_settings
 from .state import (
     COUNTRIES,
     VOTE_ORDER,
@@ -608,6 +614,164 @@ async def create_game(req: CreateGameRequest, session: AsyncSession = Depends(ge
 @app.post("/games/{game_id}/advance", response_model=GameResponse)
 async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSession = Depends(get_session)):
     event = req.event
+    if event == "ISSUE_DEBATE_STEP":
+        openai_payload: Optional[Dict[str, Any]] = None
+        openai_prompt = ""
+        openai_request: Optional[LLMRequest] = None
+        openai_provider = None
+        openai_provider_name = "fake"
+        openai_model_name: Optional[str] = None
+        openai_issue_id: Optional[str] = None
+        openai_debate_round = 1
+        openai_human_choice = "random"
+        async with session.begin():
+            game = await fetch_game_with_state(session, game_id)
+            state = game["state"]
+            current_status = game["status"]
+            if current_status in ("ISSUE_DEBATE_ROUND_1", "ISSUE_DEBATE_ROUND_2"):
+                ai = state.get("round3", {}).get("active_issue") or {}
+                issue_id = ai.get("issue_id", "1")
+                openai_issue_id = issue_id
+                openai_human_choice = ai.get("human_placement_choice", "random")
+                debate_round = ai.get("debate_round", 1)
+                openai_debate_round = debate_round
+                cursor = int(ai.get("debate_cursor", 0))
+                queue = ai.get("debate_queue", [])
+                if cursor < len(queue):
+                    speaker = queue[cursor]
+                    human_role = state.get("human_role_id")
+                    is_human = speaker == human_role
+                    settings = get_settings()
+                    openai_provider = get_llm_provider(app.state)
+                    openai_provider_name = getattr(openai_provider, "provider_name", "fake")
+                    openai_model_name = getattr(openai_provider, "model_name", None)
+                    if (
+                        settings.openai_round3_debate_speeches
+                        and debate_round == 1
+                        and not is_human
+                        and speaker != CHAIR
+                        and openai_provider_name == "openai"
+                    ):
+                        prompt_payload = build_round3_debate_speech_prompt_v1(
+                            state=state,
+                            active_issue=ai,
+                            speaker_role=speaker,
+                            debate_round=debate_round,
+                            speech_number=1,
+                            public_debate_tail=[],
+                        )
+                        openai_prompt = prompt_payload["prompt_text"]
+                        openai_payload = prompt_payload["request_payload"]
+                        openai_request = {
+                            "game_id": str(game_id),
+                            "role_id": speaker,
+                            "status": current_status,
+                            "prompt_version": "r3_debate_speech_v1",
+                            "prompt": openai_prompt,
+                            "request_payload": openai_payload,
+                        }
+        if openai_request and openai_provider:
+            try:
+                llm_response = await openai_provider.generate(openai_request)
+                llm_response = validate_llm_response(llm_response)
+            except ValidationError as e:
+                error_payload = {"error": {"type": "ValidationError", "message": str(e)}}
+                error_payload["error_type"] = e.__class__.__name__
+                error_payload["error_message"] = str(e)
+                async with session.begin():
+                    await insert_llm_trace(
+                        session,
+                        game_id,
+                        openai_request.get("role_id"),
+                        openai_request.get("status"),
+                        provider=openai_provider_name,
+                        model=openai_model_name,
+                        prompt_version=openai_request.get("prompt_version"),
+                        request_payload=openai_request.get("request_payload"),
+                        response_payload=error_payload,
+                    )
+                # OpenAI Speech-1 failures return 502 with no transcript/state advance.
+                return JSONResponse(status_code=502, content={"detail": "LLM response validation failed"})
+            except Exception as e:
+                error_payload = {"error": {"type": e.__class__.__name__, "message": str(e)}}
+                error_payload["error_type"] = e.__class__.__name__
+                error_payload["error_message"] = str(e)
+                async with session.begin():
+                    await insert_llm_trace(
+                        session,
+                        game_id,
+                        openai_request.get("role_id"),
+                        openai_request.get("status"),
+                        provider=openai_provider_name,
+                        model=openai_model_name,
+                        prompt_version=openai_request.get("prompt_version"),
+                        request_payload=openai_request.get("request_payload"),
+                        response_payload=error_payload,
+                    )
+                # OpenAI Speech-1 failures return 502 with no transcript/state advance.
+                return JSONResponse(status_code=502, content={"detail": "LLM generation failed"})
+
+            reply = llm_response.get("assistant_text", "")
+            async with session.begin():
+                game = await fetch_game_with_state(session, game_id)
+                state = game["state"]
+                current_status = game["status"]
+                if current_status not in ("ISSUE_DEBATE_ROUND_1", "ISSUE_DEBATE_ROUND_2"):
+                    raise HTTPException(status_code=400, detail="ISSUE_DEBATE_STEP only allowed during debate")
+                ai = state.get("round3", {}).get("active_issue") or {}
+                issue_id = ai.get("issue_id", "1")
+                human_choice = ai.get("human_placement_choice", "random")
+                debate_round = ai.get("debate_round", 1)
+                cursor = int(ai.get("debate_cursor", 0))
+                queue = ai.get("debate_queue", [])
+                if cursor >= len(queue):
+                    raise HTTPException(status_code=400, detail="No pending speaker")
+                speaker = queue[cursor]
+
+                await insert_llm_trace(
+                    session,
+                    game_id,
+                    openai_request.get("role_id"),
+                    openai_request.get("status"),
+                    provider=openai_provider_name,
+                    model=openai_model_name,
+                    prompt_version=openai_request.get("prompt_version"),
+                    request_payload=openai_request.get("request_payload"),
+                    response_payload=dict(llm_response),
+                )
+                transcript_id = await insert_transcript_entry(
+                    session,
+                    game_id,
+                    role_id=speaker,
+                    phase=current_status,
+                    content=reply,
+                    visible_to_human=True,
+                    round_number=3,
+                    metadata={"issue_id": issue_id, "round": debate_round, "speaker": speaker},
+                )
+                ai["debate_cursor"] = cursor + 1
+                state["round3"]["active_issue"] = ai
+                await persist_state(session, game_id, current_status, state, transcript_id)
+
+                if ai["debate_cursor"] >= len(queue):
+                    if current_status == "ISSUE_DEBATE_ROUND_1":
+                        countries = sorted(
+                            [r for r in state.get("roles", {}) if state["roles"][r].get("type") == "country"]
+                        )
+                        ngos = sorted([r for r in state.get("roles", {}) if state["roles"][r].get("type") == "ngo"])
+                        human_role = state.get("human_role_id")
+                        seed = game["seed"]
+                        countries = _human_placement(countries, human_role, human_choice, seed, f"{issue_id}-countries-2")
+                        ngos = _human_placement(ngos, human_role, human_choice, seed, f"{issue_id}-ngos-2")
+                        ai["debate_queue"] = countries + ngos
+                        ai["debate_cursor"] = 0
+                        ai["debate_round"] = 2
+                        state["round3"]["active_issue"] = ai
+                        await persist_state_no_checkpoint(session, game_id, "ISSUE_DEBATE_ROUND_2", state)
+                    else:
+                        await persist_state_no_checkpoint(session, game_id, "ISSUE_POSITION_FINALIZATION", state)
+
+            return {"game_id": game_id, "state": state}
     if event in ("CONVO_1_MESSAGE", "CONVO_2_MESSAGE", "CONVO_MESSAGE"):
         # Phase 1: commit the human message and state update.
         async with session.begin():
@@ -1303,16 +1467,50 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 return {"game_id": game_id, "state": state}
 
             # AI speaker
-            opts = ai.get("options", [])
-            options_text = "; ".join([f"{o.get('option_id')} {o.get('label')}: {o.get('short_description')}" for o in opts])
-            prompt = (
-                f"Role: {speaker}\n"
-                f"Issue: {ai.get('issue_title')} ({issue_id})\n"
-                f"Prompt: {ai.get('ui_prompt')}\n"
-                f"Options: {options_text}\n"
-                f"Deliver a short debate statement (1-2 paragraphs) advocating a position and responding to prior discussion."
+            speech_number = 1 if debate_round == 1 else 2
+            prompt_payload = build_round3_debate_speech_prompt_v1(
+                state=state,
+                active_issue=ai,
+                speaker_role=speaker,
+                debate_round=debate_round,
+                speech_number=speech_number,
+                public_debate_tail=[],
             )
-            reply = await get_ai_responder().respond(prompt)
+            prompt = prompt_payload["prompt_text"]
+            trace_request_payload = prompt_payload["request_payload"]
+            # Round 3 OpenAI is opt-in and limited to Speech 1 for non-chair roles.
+            settings = get_settings()
+            use_openai_r3 = bool(settings.openai_round3_debate_speeches) and debate_round == 1 and speaker != CHAIR
+            provider = get_llm_provider(app.state)
+            provider_name = getattr(provider, "provider_name", "fake")
+            model_name = getattr(provider, "model_name", None)
+            if use_openai_r3 and provider_name == "openai":
+                llm_request: LLMRequest = {
+                    "game_id": str(game_id),
+                    "role_id": speaker,
+                    "status": current_status,
+                    "prompt_version": "r3_debate_speech_v1",
+                    "prompt": prompt,
+                    "request_payload": trace_request_payload,
+                }
+                llm_response = await provider.generate(llm_request)
+                llm_response = validate_llm_response(llm_response)
+                reply = llm_response.get("assistant_text", "")
+            else:
+                provider_name = "fake"
+                model_name = "fake"
+                reply = await get_ai_responder().respond(prompt)
+            await insert_llm_trace(
+                session,
+                game_id,
+                speaker,
+                current_status,
+                provider=provider_name,
+                model=model_name,
+                prompt_version="r3_debate_speech_v1",
+                request_payload=trace_request_payload,
+                response_payload={"assistant_text": reply},
+            )
             transcript_id = await insert_transcript_entry(
                 session,
                 game_id,

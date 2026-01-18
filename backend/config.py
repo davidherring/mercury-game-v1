@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     llm_provider: str | None = Field(default=None, validation_alias="LLM_PROVIDER")
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     openai_model: str | None = Field(default=None, validation_alias="OPENAI_MODEL")
+    openai_round3_debate_speeches: bool = Field(
+        default=False, validation_alias="OPENAI_ROUND3_DEBATE_SPEECHES"
+    )
 
     model_config = SettingsConfigDict(
         env_file=str(_default_env_file()),
