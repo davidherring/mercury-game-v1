@@ -38,3 +38,9 @@ Template for new entries:
 - Failure behavior (Speech 1 OpenAI): write `llm_traces` with error metadata, return 502, no transcript write, no state advance. See `backend/main.py`.
 - Tracing: both FakeLLM and OpenAI debate speeches write `llm_traces` with structured `request_payload.context` (active issue/options, speech slot, speaker, bounded debate transcript tail, opening summary, stance snapshot). See `backend/prompt_builder.py`.
 - Tests: offline-only stubs cover Speech‑1 OpenAI success and failure in `tests/test_round3_openai_speech1_tracing.py` (no network calls).
+
+### Typing/Interfaces (Round 3 OpenAI integration)
+- Use typed request objects (LLMRequest) rather than ad-hoc dicts when calling providers to keep `status`, `prompt_version`, and `request_payload` consistent. See `backend/main.py` and `backend/llm_provider.py`.
+- Error payloads should be JSON-shaped types (`Dict[str, Any]` or a narrow TypedDict), not `Dict[str, Dict[str, str]]`, because we attach string fields like `error_type`/`error_message`.
+- Prefer attribute/required-field access over `.get()` for required fields (e.g., `status`) to keep trace insertion type-safe.
+- Keep `request_payload` structured and JSON-serializable; annotate with `Dict[str, Any]` (or `Mapping[str, Any]`) to reflect real usage.
