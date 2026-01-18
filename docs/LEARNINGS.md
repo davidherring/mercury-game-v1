@@ -44,3 +44,15 @@ Template for new entries:
 - Error payloads should be JSON-shaped types (`Dict[str, Any]` or a narrow TypedDict), not `Dict[str, Dict[str, str]]`, because we attach string fields like `error_type`/`error_message`.
 - Prefer attribute/required-field access over `.get()` for required fields (e.g., `status`) to keep trace insertion type-safe.
 - Keep `request_payload` structured and JSON-serializable; annotate with `Dict[str, Any]` (or `Mapping[str, Any]`) to reflect real usage.
+
+### Test Hygiene: AsyncSession cleanup (Pytest warnings)
+- Symptom: `PytestUnraisableExceptionWarning` with `AsyncSession.close` and “Event loop is closed”.
+- Common trigger: `async for session in get_session(): ... break` (single-use generator, cleanup deferred to GC).
+- Preferred: use `async with` session fixtures or sessionmaker directly when available.
+- If consuming `get_session()` directly, explicitly close the generator:
+  - `agen = get_session(); session = await agen.__anext__(); ... finally: await agen.aclose()`
+- Rationale: guarantees session close while the event loop is still alive.
+- Checklist: avoid breaking out of async generators without `agen.aclose()`.
+- Quick scan: `grep -R "async for session in get_session" -n tests`.
+- If warnings appear, reproduce with a small DB-heavy subset before running the full suite.
+- Sprint 18: updated targeted tests to close the generator; warnings stopped in the subset run.

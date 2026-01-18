@@ -53,11 +53,14 @@ async def test_conversation_progression_and_checkpoints():
         game_id = await _prepare_convo_active(client)
 
         t_before, c_before = 0, 0
-        async for session in get_session():
+        agen = get_session()
+        session = await agen.__anext__()
+        try:
             assert isinstance(session, AsyncSession)
             t_before = await _count(session, "transcript_entries", game_id)
             c_before = await _count(session, "checkpoints", game_id)
-            break
+        finally:
+            await agen.aclose()
 
         # 5 exchanges -> 10 messages + 1 interrupt = +11 transcripts
         for i in range(5):
@@ -68,11 +71,14 @@ async def test_conversation_progression_and_checkpoints():
             assert resp.status_code == 200
 
         t_after, c_after = 0, 0
-        async for session in get_session():
+        agen = get_session()
+        session = await agen.__anext__()
+        try:
             assert isinstance(session, AsyncSession)
             t_after = await _count(session, "transcript_entries", game_id)
             c_after = await _count(session, "checkpoints", game_id)
-            break
+        finally:
+            await agen.aclose()
 
         assert t_after - t_before == 11
         # 5 exchanges *2 + interrupt checkpoint = 11 checkpoints deltas (one per message including interrupt)
@@ -98,11 +104,14 @@ async def test_interrupt_and_final_closure():
         assert any(e.get("metadata", {}).get("interrupt") for e in entries if isinstance(e.get("metadata"), dict))
 
         t_before, c_before = 0, 0
-        async for session in get_session():
+        agen = get_session()
+        session = await agen.__anext__()
+        try:
             assert isinstance(session, AsyncSession)
             t_before = await _count(session, "transcript_entries", game_id)
             c_before = await _count(session, "checkpoints", game_id)
-            break
+        finally:
+            await agen.aclose()
 
         # Final human message after interrupt
         final_resp = await client.post(
@@ -115,11 +124,14 @@ async def test_interrupt_and_final_closure():
         assert state["round2"]["convo1"]["status"] == "CLOSED"
 
         t_after, c_after = 0, 0
-        async for session in get_session():
+        agen = get_session()
+        session = await agen.__anext__()
+        try:
             assert isinstance(session, AsyncSession)
             t_after = await _count(session, "transcript_entries", game_id)
             c_after = await _count(session, "checkpoints", game_id)
-            break
+        finally:
+            await agen.aclose()
 
         assert t_after - t_before == 2
         assert c_after - c_before == 2

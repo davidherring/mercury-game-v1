@@ -37,11 +37,14 @@ async def test_round1_step_adds_two_transcripts_and_checkpoint():
 
         transcripts_before: int | None = None
         checkpoints_before: int | None = None
-        async for session in get_session():
+        agen = get_session()
+        session = await agen.__anext__()
+        try:
             assert isinstance(session, AsyncSession)
             transcripts_before = await _count_rows(session, "transcript_entries", game_id)
             checkpoints_before = await _count_rows(session, "checkpoints", game_id)
-            break
+        finally:
+            await agen.aclose()
         assert transcripts_before is not None
         assert checkpoints_before is not None
 
@@ -52,11 +55,14 @@ async def test_round1_step_adds_two_transcripts_and_checkpoint():
 
         transcripts_after: int | None = None
         checkpoints_after: int | None = None
-        async for session in get_session():
+        agen = get_session()
+        session = await agen.__anext__()
+        try:
             assert isinstance(session, AsyncSession)
             transcripts_after = await _count_rows(session, "transcript_entries", game_id)
             checkpoints_after = await _count_rows(session, "checkpoints", game_id)
-            break
+        finally:
+            await agen.aclose()
         assert transcripts_after is not None
         assert checkpoints_after is not None
 
@@ -86,11 +92,14 @@ async def test_round1_full_progression_reaches_round2_setup():
 
         transcript_count: int | None = None
         checkpoint_count: int | None = None
-        async for session in get_session():
+        agen = get_session()
+        session = await agen.__anext__()
+        try:
             assert isinstance(session, AsyncSession)
             transcript_count = await _count_rows(session, "transcript_entries", game_id)
             checkpoint_count = await _count_rows(session, "checkpoints", game_id)
-            break
+        finally:
+            await agen.aclose()
         assert transcript_count is not None
         assert checkpoint_count is not None
 
