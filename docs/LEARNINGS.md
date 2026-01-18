@@ -56,3 +56,11 @@ Template for new entries:
 - Quick scan: `grep -R "async for session in get_session" -n tests`.
 - If warnings appear, reproduce with a small DB-heavy subset before running the full suite.
 - Sprint 18: updated targeted tests to close the generator; warnings stopped in the subset run.
+
+---
+
+## Sprint 19 — Stance Updates & Proposal/Vote Sanity
+- **Stance defaults must be merge-only.** Normalizing or initializing `state["stances"]` must preserve existing acceptance maps and `None` values; destructive re-init breaks negotiation semantics and downstream proposal/vote logic.
+- **Apply stance shifts once per logical message, not per transcript row.** In Round 2, shifting once per human message avoids double-counting when AI replies are generated in the same event.
+- **Bounded, deterministic stance deltas are sufficient to make negotiation consequential.** Small, clamped, auditable shifts (without NLP or helper agents) were enough to drive meaningful proposal selection and unanimous-vote outcomes.
+- **Seed authoritative stances at Round 1.** Applying `opening_variants.initial_stances` into `state["stances"]` ensures proposals and votes are meaningful from the first issue onward.

@@ -19,6 +19,7 @@ from .prompt_builder import (
     build_round2_context,
     build_round3_debate_speech_prompt_v1,
 )
+from .stance_shift import apply_stance_shift
 from .config import get_settings
 from .config import get_settings
 from .state import (
@@ -28,6 +29,7 @@ from .state import (
     CHAIR,
     NGOS,
     ensure_default_stances,
+    merge_initial_stances,
     initial_state,
     pick_opening_variant,
     speaker_order_with_constraint,
@@ -274,6 +276,51 @@ def _proposal_support(state: Dict[str, Any], issue_id: str, options: List[Dict[s
             total += float(acc)
         totals[oid] = total
     return totals
+
+
+def _issue_option_spec_from_defs(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
+    spec: Dict[str, Any] = {}
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        issue_key = issue.get("issue_id")
+        if not isinstance(issue_key, str):
+            continue
+        spec[issue_key] = {"options": issue.get("options", [])}
+    return spec
+
+
+def _issue_option_spec_from_active_issue(issue_id: str, options: Any) -> Dict[str, Any]:
+    if not isinstance(options, list):
+        options = []
+    return {issue_id: {"options": options}}
+
+
+def _apply_stance_shifts_for_roles(
+    *,
+    state: Dict[str, Any],
+    role_ids: List[str],
+    round_id: int,
+    issue_id: Optional[str],
+    trigger_text: str,
+    issue_option_spec: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    updated = state.get("stances", {})
+    reasons_all: List[Dict[str, Any]] = []
+    for rid in role_ids:
+        updated, reasons = apply_stance_shift(
+            role_id=rid,
+            round_id=round_id,
+            issue_id=issue_id,
+            trigger_text=trigger_text,
+            stance_snapshot=updated,
+            issue_option_spec=issue_option_spec,
+        )
+        if reasons:
+            reasons_all.extend(reasons)
+    if reasons_all:
+        state["stances"] = updated
+    return reasons_all
 
 
 def _canonicalize_votes(ai: Dict[str, Any]) -> None:
@@ -769,6 +816,17 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 )
                 ai["debate_cursor"] = cursor + 1
                 state["round3"]["active_issue"] = ai
+                issue_spec = _issue_option_spec_from_active_issue(issue_id, ai.get("options", []))
+                reasons = _apply_stance_shifts_for_roles(
+                    state=state,
+                    role_ids=[speaker],
+                    round_id=3,
+                    issue_id=issue_id,
+                    trigger_text=reply,
+                    issue_option_spec=issue_spec,
+                )
+                if reasons:
+                    state.setdefault("round3", {}).setdefault("stance_log", []).extend(reasons)
                 await persist_state(session, game_id, current_status, state, transcript_id)
 
                 if ai["debate_cursor"] >= len(queue):
@@ -838,6 +896,18 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             convo["human_turns_used"] = human_turns + 1
             if post_interrupt:
                 convo["final_human_sent"] = True
+            issues = await fetch_issue_definitions(session)
+            issue_spec = _issue_option_spec_from_defs(issues)
+            reasons = _apply_stance_shifts_for_roles(
+                state=state,
+                role_ids=[human_role_id, partner],
+                round_id=2,
+                issue_id=None,
+                trigger_text=content,
+                issue_option_spec=issue_spec,
+            )
+            if reasons:
+                state.setdefault("round2", {}).setdefault("stance_log", []).extend(reasons)
             await persist_state(session, game_id, "ROUND_2_CONVERSATION_ACTIVE", state, human_tid)
 
             partner_role = partner
@@ -1092,6 +1162,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 if role_id == CHAIR:
                     continue
                 chosen = pick_opening_variant(role_id, seed, openings_by_role.get(role_id, []))
+                merge_initial_stances(state, role_id, chosen.get("initial_stances"))
                 openings[role_id] = {
                     "variant_id": chosen["id"],
                     "text": chosen["opening_text"],
@@ -1479,6 +1550,17 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                     round_number=3,
                     metadata={"issue_id": issue_id, "round": debate_round, "speaker": speaker},
                 )
+                issue_spec = _issue_option_spec_from_active_issue(issue_id, ai.get("options", []))
+                reasons = _apply_stance_shifts_for_roles(
+                    state=state,
+                    role_ids=[speaker],
+                    round_id=3,
+                    issue_id=issue_id,
+                    trigger_text=content,
+                    issue_option_spec=issue_spec,
+                )
+                if reasons:
+                    state.setdefault("round3", {}).setdefault("stance_log", []).extend(reasons)
                 ai["debate_cursor"] = cursor + 1
                 state["round3"]["active_issue"] = ai
                 await persist_state(session, game_id, current_status, state, transcript_id)
@@ -1539,6 +1621,17 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 round_number=3,
                 metadata={"issue_id": issue_id, "round": debate_round, "speaker": speaker},
             )
+            issue_spec = _issue_option_spec_from_active_issue(issue_id, ai.get("options", []))
+            reasons = _apply_stance_shifts_for_roles(
+                state=state,
+                role_ids=[speaker],
+                round_id=3,
+                issue_id=issue_id,
+                trigger_text=reply,
+                issue_option_spec=issue_spec,
+            )
+            if reasons:
+                state.setdefault("round3", {}).setdefault("stance_log", []).extend(reasons)
             ai["debate_cursor"] = cursor + 1
             state["round3"]["active_issue"] = ai
             await persist_state(session, game_id, current_status, state, transcript_id)

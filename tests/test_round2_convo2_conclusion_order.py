@@ -7,6 +7,7 @@ from backend.main import app
 async def _advance(client: AsyncClient, game_id: str, event: str, payload: dict):
     resp = await client.post(f"/games/{game_id}/advance", json={"event": event, "payload": payload})
     resp.raise_for_status()
+    await resp.aread()
     return resp
 
 
