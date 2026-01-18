@@ -647,17 +647,18 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                     openai_model_name = getattr(openai_provider, "model_name", None)
                     if (
                         settings.openai_round3_debate_speeches
-                        and debate_round == 1
+                        and debate_round in (1, 2)
                         and not is_human
                         and speaker != CHAIR
                         and openai_provider_name == "openai"
                     ):
+                        speech_number = 1 if debate_round == 1 else 2
                         prompt_payload = build_round3_debate_speech_prompt_v1(
                             state=state,
                             active_issue=ai,
                             speaker_role=speaker,
                             debate_round=debate_round,
-                            speech_number=1,
+                            speech_number=speech_number,
                             public_debate_tail=[],
                         )
                         openai_prompt = prompt_payload["prompt_text"]
@@ -1480,7 +1481,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             trace_request_payload = prompt_payload["request_payload"]
             # Round 3 OpenAI is opt-in and limited to Speech 1 for non-chair roles.
             settings = get_settings()
-            use_openai_r3 = bool(settings.openai_round3_debate_speeches) and debate_round == 1 and speaker != CHAIR
+            use_openai_r3 = bool(settings.openai_round3_debate_speeches) and debate_round in (1, 2) and speaker != CHAIR
             provider = get_llm_provider(app.state)
             provider_name = getattr(provider, "provider_name", "fake")
             model_name = getattr(provider, "model_name", None)
