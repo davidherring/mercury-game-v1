@@ -3,7 +3,7 @@ import json
 import random
 import uuid
 import hashlib
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict, cast
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
@@ -35,6 +35,15 @@ from .state import (
 
 
 app = FastAPI(title="Mercury Game Backend")
+
+
+class _RequiredLLMRequest(TypedDict):
+    game_id: str
+    role_id: str
+    status: str
+    prompt_version: str
+    prompt: str
+    request_payload: Dict[str, Any]
 
 
 class CreateGameRequest(BaseModel):
@@ -663,50 +672,58 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                         )
                         openai_prompt = prompt_payload["prompt_text"]
                         openai_payload = prompt_payload["request_payload"]
-                        openai_request = {
-                            "game_id": str(game_id),
-                            "role_id": speaker,
-                            "status": current_status,
-                            "prompt_version": "r3_debate_speech_v1",
-                            "prompt": openai_prompt,
-                            "request_payload": openai_payload,
-                        }
+                        openai_request = cast(
+                            LLMRequest,
+                            {
+                                "game_id": str(game_id),
+                                "role_id": speaker,
+                                "status": current_status,
+                                "prompt_version": "r3_debate_speech_v1",
+                                "prompt": openai_prompt,
+                                "request_payload": openai_payload,
+                            },
+                        )
         if openai_request and openai_provider:
+            required_request = cast(_RequiredLLMRequest, openai_request)
+            openai_role_id = required_request["role_id"]
+            openai_status = required_request["status"]
+            openai_prompt_version = required_request["prompt_version"]
+            openai_request_payload = required_request["request_payload"]
             try:
                 llm_response = await openai_provider.generate(openai_request)
                 llm_response = validate_llm_response(llm_response)
             except ValidationError as e:
-                error_payload = {"error": {"type": "ValidationError", "message": str(e)}}
+                error_payload: Dict[str, Any] = {"error": {"type": "ValidationError", "message": str(e)}}
                 error_payload["error_type"] = e.__class__.__name__
                 error_payload["error_message"] = str(e)
                 async with session.begin():
                     await insert_llm_trace(
                         session,
                         game_id,
-                        openai_request.get("role_id"),
-                        openai_request.get("status"),
+                        openai_role_id,
+                        openai_status,
                         provider=openai_provider_name,
                         model=openai_model_name,
-                        prompt_version=openai_request.get("prompt_version"),
-                        request_payload=openai_request.get("request_payload"),
+                        prompt_version=openai_prompt_version,
+                        request_payload=openai_request_payload,
                         response_payload=error_payload,
                     )
                 # OpenAI Speech-1 failures return 502 with no transcript/state advance.
                 return JSONResponse(status_code=502, content={"detail": "LLM response validation failed"})
             except Exception as e:
-                error_payload = {"error": {"type": e.__class__.__name__, "message": str(e)}}
+                error_payload: Dict[str, Any] = {"error": {"type": e.__class__.__name__, "message": str(e)}}
                 error_payload["error_type"] = e.__class__.__name__
                 error_payload["error_message"] = str(e)
                 async with session.begin():
                     await insert_llm_trace(
                         session,
                         game_id,
-                        openai_request.get("role_id"),
-                        openai_request.get("status"),
+                        openai_role_id,
+                        openai_status,
                         provider=openai_provider_name,
                         model=openai_model_name,
-                        prompt_version=openai_request.get("prompt_version"),
-                        request_payload=openai_request.get("request_payload"),
+                        prompt_version=openai_prompt_version,
+                        request_payload=openai_request_payload,
                         response_payload=error_payload,
                     )
                 # OpenAI Speech-1 failures return 502 with no transcript/state advance.
@@ -732,12 +749,12 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 await insert_llm_trace(
                     session,
                     game_id,
-                    openai_request.get("role_id"),
-                    openai_request.get("status"),
+                    openai_role_id,
+                    openai_status,
                     provider=openai_provider_name,
                     model=openai_model_name,
-                    prompt_version=openai_request.get("prompt_version"),
-                    request_payload=openai_request.get("request_payload"),
+                    prompt_version=openai_prompt_version,
+                    request_payload=openai_request_payload,
                     response_payload=dict(llm_response),
                 )
                 transcript_id = await insert_transcript_entry(
@@ -877,7 +894,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             llm_response = await provider.generate(llm_request)
             llm_response = validate_llm_response(llm_response)
         except ValidationError as e:
-            error_payload = {"error": {"type": "ValidationError", "message": str(e)}}
+            error_payload: Dict[str, Any] = {"error": {"type": "ValidationError", "message": str(e)}}
             if provider_name == "openai":
                 error_payload["error_type"] = e.__class__.__name__
                 error_payload["error_message"] = str(e)
@@ -897,7 +914,7 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                 return JSONResponse(status_code=502, content={"detail": "LLM response validation failed"})
             raise HTTPException(status_code=502, detail="LLM response validation failed")
         except Exception as e:
-            error_payload = {"error": {"type": e.__class__.__name__, "message": str(e)}}
+            error_payload: Dict[str, Any] = {"error": {"type": e.__class__.__name__, "message": str(e)}}
             if provider_name == "openai":
                 error_payload["error_type"] = e.__class__.__name__
                 error_payload["error_message"] = str(e)
