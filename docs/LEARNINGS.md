@@ -28,3 +28,13 @@ Template for new entries:
 - Avoid global `engine.dispose()` teardown during tests when it re-triggers loop/pool issues (Sprint 16B context).
 
 - Pytest config warning: remove unsupported `asyncio_default_fixture_loop_scope` when the installed pytest-asyncio does not recognize it. See `pytest.ini`.
+
+---
+
+## Sprint 18 — Round 3 Speech-1 OpenAI Gating + Tracing
+- Round 3 debate Speech 1 (`ISSUE_DEBATE_ROUND_1`) for non-chair scheduled speakers can use OpenAI when enabled; Speech 2 stays FakeLLM. See `backend/main.py`.
+- Japan/Chair remains scripted/deterministic and never uses OpenAI.
+- Gating/vars: `LLM_PROVIDER=openai`, `OPENAI_API_KEY=...`, and `OPENAI_ROUND3_DEBATE_SPEECHES=1` are required for real OpenAI calls. Default behavior remains FakeLLM/offline.
+- Failure behavior (Speech 1 OpenAI): write `llm_traces` with error metadata, return 502, no transcript write, no state advance. See `backend/main.py`.
+- Tracing: both FakeLLM and OpenAI debate speeches write `llm_traces` with structured `request_payload.context` (active issue/options, speech slot, speaker, bounded debate transcript tail, opening summary, stance snapshot). See `backend/prompt_builder.py`.
+- Tests: offline-only stubs cover Speech‑1 OpenAI success and failure in `tests/test_round3_openai_speech1_tracing.py` (no network calls).

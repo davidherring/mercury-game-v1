@@ -119,10 +119,15 @@ Some AI code generation environments cannot reach your database and therefore ca
 - Enable OpenAI locally (Round 2 private conversations only):
   - `LLM_PROVIDER=openai`
   - `OPENAI_API_KEY=...`
-  - `OPENAI_MODEL=...` (optional; current default is `gpt-5-nano`)
-- Tracing: every Round 2 LLM call writes `llm_traces` with `provider`, `model`, `prompt_version` (`r2_convo_v1`), and request/response payloads. Example query:
+- Tracing: every Round 2 LLM call writes `llm_traces` with `provider`, `model`, `prompt_version` (`r2_convo_v3`), and request/response payloads. Example query:
   - `SELECT provider, model, prompt_version, request_payload, response_payload FROM llm_traces WHERE game_id = '<id>';`
 - CI/tests: run with FakeLLM only. Do not set `OPENAI_API_KEY` or `LLM_PROVIDER=openai` in CI. OpenAI behavior is covered via stubs/monkeypatch; no network calls occur in tests.
+
+### LLM Providers (Round 3 debate)
+- Optional OpenAI for Speech 1 only (non-chair scheduled speakers in `ISSUE_DEBATE_ROUND_1`): set `LLM_PROVIDER=openai`, `OPENAI_API_KEY=...`, and `OPENAI_ROUND3_DEBATE_SPEECHES=1`.
+- Speech 2 remains FakeLLM; Japan/Chair never uses OpenAI.
+- Failure behavior (OpenAI Speech 1): 502, no transcript write, no state advance; `llm_traces` records error metadata.
+- Tests/CI remain offline; no network calls are made in tests.
 
 ### Review (end-of-game payload)
 - Endpoint: `GET /games/{game_id}/review`
@@ -138,7 +143,6 @@ curl http://localhost:8000/games/<GAME_ID>/review
     - `ISSUE_DEBATE_STEP` is allowed and idempotent (ensures the resolution transcript exists; does not advance).
     - `ISSUE_RESOLUTION_CONTINUE` advances to `ROUND_3_SETUP` (if issues remain) or `REVIEW` (when all issues are closed).
 
-### LLM providers (current: FakeLLM; future: OpenAI)
-- Current behavior: all LLM calls use FakeLLM via the provider boundary (`backend/llm_provider.py:get_llm_provider`); prompts are built in `backend/prompt_builder.py`; traces are written to `llm_traces` with provider/model/prompt_version (currently “fake”/“fake”/“r2_convo_v1”).
-- Sprint 13 plan: add a feature flag/env selector (e.g., `LLM_PROVIDER=fake|openai`) and OpenAI credentials (e.g., `OPENAI_API_KEY`) to opt into OpenAI in dev; CI remains on FakeLLM for determinism.
-- Traces will continue to capture provider/model/prompt_version; OpenAI calls will record provider=`openai`, model=<chosen model>, with the same prompt_version and request/response payload shape.
+### LLM providers (current)
+- LLM calls use FakeLLM by default via the provider boundary (`backend/llm_provider.py:get_llm_provider`); prompts are built in `backend/prompt_builder.py`.
+- Traces capture provider/model/prompt_version and request/response payloads for both FakeLLM and OpenAI calls.
