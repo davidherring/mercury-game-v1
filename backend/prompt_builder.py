@@ -220,6 +220,7 @@ def build_round3_debate_speech_prompt_v1(
     roles = state.get("roles", {})
     role_info = roles.get(speaker_role, {}) if isinstance(roles, dict) else {}
     role_name = role_info.get("display_name") or speaker_role
+    role_type_context = _build_round3_role_type_context(role_info)
     opening_text = state.get("round1", {}).get("openings", {}).get(speaker_role, {}).get("text") or ""
     opening_summary = _summarize_public_opening(opening_text)
     stance_snapshot = _extract_public_stance_snapshot(state, speaker_role, issue_id)
@@ -243,6 +244,7 @@ def build_round3_debate_speech_prompt_v1(
         "active_issue": {"id": issue_id, "title": issue_title, "options": options_payload},
         "speech_slot": {"speech_number": speech_number, "debate_round": debate_round},
         "speaker": {"role_id": speaker_role, "role_name": role_name, "is_human": False},
+        "speaker_role_context": role_type_context,
         "speaker_opening_summary": opening_summary,
         "speaker_issue_stance_snapshot": stance_snapshot,
         "debate_transcript_tail": tail_payload,
@@ -258,6 +260,7 @@ def build_round3_debate_speech_prompt_v1(
         "options": options_payload,
         "speaker_role": speaker_role,
         "speaker_role_name": role_name,
+        "speaker_role_context": role_type_context,
         "speaker_opening_summary": opening_summary,
         "speaker_issue_stance_snapshot": stance_snapshot,
         "debate_transcript_tail": tail_payload,
@@ -307,6 +310,37 @@ def _extract_public_stance_snapshot(
         if key in stances:
             snapshot[key] = stances.get(key)
     return snapshot
+
+
+def _build_round3_role_type_context(role_info: Dict[str, Any]) -> Dict[str, str]:
+    role_type = role_info.get("type")
+    if role_type == "country":
+        return {
+            "role_type": "country",
+            "voting_eligibility": "voting",
+            "institutional_posture": "government representative",
+            "intended_function": "decision and accountability",
+        }
+    if role_type == "ngo":
+        return {
+            "role_type": "ngo",
+            "voting_eligibility": "non-voting",
+            "institutional_posture": "NGO advocate",
+            "intended_function": "persuasion and evidence",
+        }
+    if role_type == "chair":
+        return {
+            "role_type": "chair",
+            "voting_eligibility": "non-voting",
+            "institutional_posture": "chair moderator",
+            "intended_function": "procedural moderation",
+        }
+    return {
+        "role_type": str(role_type) if role_type else "unknown",
+        "voting_eligibility": "unknown",
+        "institutional_posture": "unknown",
+        "intended_function": "unknown",
+    }
 
 
 __all__ = [
