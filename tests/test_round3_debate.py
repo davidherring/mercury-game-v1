@@ -58,11 +58,14 @@ async def test_full_debate_progression_all_ai():
         queue1 = state_resp.json()["state"]["round3"]["active_issue"]["debate_queue"]
 
         t_before = c_before = 0
-        async for session in get_session():
+        agen = get_session()
+        session = await agen.__anext__()
+        try:
             assert isinstance(session, AsyncSession)
             t_before = await _count(session, "transcript_entries", game_id)
             c_before = await _count(session, "checkpoints", game_id)
-            break
+        finally:
+            await agen.aclose()
 
         for _ in range(len(queue1)):
             resp = await client.post(f"/games/{game_id}/advance", json={"event": "ISSUE_DEBATE_STEP", "payload": {}})
@@ -81,11 +84,14 @@ async def test_full_debate_progression_all_ai():
         assert final_state["status"] == "ISSUE_POSITION_FINALIZATION"
 
         t_after = c_after = 0
-        async for session in get_session():
+        agen = get_session()
+        session = await agen.__anext__()
+        try:
             assert isinstance(session, AsyncSession)
             t_after = await _count(session, "transcript_entries", game_id)
             c_after = await _count(session, "checkpoints", game_id)
-            break
+        finally:
+            await agen.aclose()
 
         # One transcript/checkpoint per AI speech; total = len(queue1)+len(queue2)
         assert t_after - t_before == len(queue1) + len(queue2)
