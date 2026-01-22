@@ -41,6 +41,7 @@ async def test_convo2_conclusion_happens_after_final_exchange():
         create = await client.post("/games", json={})
         create.raise_for_status()
         game_id = create.json()["game_id"]
+        await create.aread()
 
         await _advance(client, game_id, "ROLE_CONFIRMED", {"human_role_id": "USA"})
         await _advance(client, game_id, "ROUND_1_READY", {})

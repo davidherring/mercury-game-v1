@@ -1,4 +1,5 @@
 import json
+import os
 import pytest
 from typing import Any, cast
 from httpx import ASGITransport, AsyncClient
@@ -127,32 +128,45 @@ async def test_round2_llm_writes_trace_row():
         assert resp_payload.get("assistant_text") == ai_content
 
 
-@pytest.mark.skip(reason="OpenAI provider selection is disabled in Sprint 14 (FakeLLM-only)")
+@pytest.mark.skipif(
+    os.getenv("RUN_OPENAI_INTEGRATION_TESTS") != "1",
+    reason=(
+        "OpenAI integration tests are opt-in. Set RUN_OPENAI_INTEGRATION_TESTS=1 and run with "
+        "MERCURY_ENV=dev (or prod) and valid OPENAI_API_KEY."
+    ),
+)
 def test_provider_selection_openai(monkeypatch: pytest.MonkeyPatch):
     _reset_provider_cache()
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-key")
-    monkeypatch.setenv("OPENAI_MODEL", "stub-model")
     provider = get_llm_provider(SimpleNamespace())
     assert isinstance(provider, OpenAIProvider)
     assert provider.provider_name == "openai"
-    assert provider.model_name == "stub-model"
+    assert provider.model_name
     _reset_provider_cache()
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENAI_MODEL", raising=False)
     provider2 = get_llm_provider(SimpleNamespace())
     assert isinstance(provider2, FakeLLMProvider)
 
 
-@pytest.mark.skip(reason="OpenAI provider selection is disabled in Sprint 14 (FakeLLM-only)")
+@pytest.mark.skipif(
+    os.getenv("RUN_OPENAI_INTEGRATION_TESTS") != "1",
+    reason=(
+        "OpenAI integration tests are opt-in. Set RUN_OPENAI_INTEGRATION_TESTS=1 and run with "
+        "MERCURY_ENV=dev (or prod) and valid OPENAI_API_KEY."
+    ),
+)
 # @pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_round2_llm_trace_openai_stub(monkeypatch: pytest.MonkeyPatch):
     _reset_provider_cache()
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-key")
-    monkeypatch.setenv("OPENAI_MODEL", "stub-model")
+    provider = get_llm_provider(app.state)
+    assert isinstance(provider, OpenAIProvider)
+    expected_model = provider.model_name
+    assert expected_model
 
     async def _stub_generate(self, request):
         prompt = request.get("prompt") or ""
@@ -198,7 +212,7 @@ async def test_round2_llm_trace_openai_stub(monkeypatch: pytest.MonkeyPatch):
         assert traces, "No llm_traces rows found for OpenAI stub"
         trace = traces[-1]
         assert trace["provider"] == "openai"
-        assert trace["model"] == "stub-model"
+        assert trace["model"] == expected_model
         assert trace["prompt_version"] == "r2_convo_v3"
         resp_payload = trace.get("response_payload") or {}
         assert resp_payload.get("assistant_text") == ai_content
@@ -206,4 +220,3 @@ async def test_round2_llm_trace_openai_stub(monkeypatch: pytest.MonkeyPatch):
     _reset_provider_cache()
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENAI_MODEL", raising=False)

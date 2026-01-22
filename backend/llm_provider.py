@@ -81,17 +81,27 @@ def get_llm_provider(app_state: Any) -> LLMProvider:
         return existing
 
     settings = get_settings()
-    provider_choice = (settings.llm_provider or "").lower()
-    if provider_choice == "openai" and settings.openai_api_key:
-        provider = OpenAIProvider(api_key=settings.openai_api_key, model=DEFAULT_OPENAI_MODEL)
-    else:
+    env_mode = getattr(app_state, "mercury_env", None)
+    if not env_mode:
+        env_mode = settings.mercury_env
+        setattr(app_state, "mercury_env", env_mode)
+
+    if env_mode == "test":
         responder = getattr(app_state, "ai_responder", None) or FakeLLM()
         provider = FakeLLMProvider(responder)
+    else:
+        provider_choice = (settings.llm_provider or "").lower()
+        if provider_choice == "openai" and settings.openai_api_key:
+            provider = OpenAIProvider(api_key=settings.openai_api_key, model=DEFAULT_OPENAI_MODEL)
+        else:
+            responder = getattr(app_state, "ai_responder", None) or FakeLLM()
+            provider = FakeLLMProvider(responder)
 
     if settings.app_env == "local":
         logger.info(
             "LLM provider selected",
             extra={
+                "mercury_env": env_mode,
                 "llm_provider_env": os.getenv("LLM_PROVIDER"),
                 "provider_name": getattr(provider, "provider_name", None),
                 "model_name": getattr(provider, "model_name", None),
@@ -124,6 +134,10 @@ class OpenAIProvider:
         return self._model_name
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
+        settings = get_settings()
+        if settings.mercury_env == "test":
+            raise RuntimeError("OpenAI is disabled in test mode (MERCURY_ENV=test).")
+
         # Lazy import to avoid hard dependency when not used
         try:
             from openai import AsyncOpenAI  # type: ignore

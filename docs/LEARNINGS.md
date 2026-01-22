@@ -64,3 +64,14 @@ Template for new entries:
 - **Apply stance shifts once per logical message, not per transcript row.** In Round 2, shifting once per human message avoids double-counting when AI replies are generated in the same event.
 - **Bounded, deterministic stance deltas are sufficient to make negotiation consequential.** Small, clamped, auditable shifts (without NLP or helper agents) were enough to drive meaningful proposal selection and unanimous-vote outcomes.
 - **Seed authoritative stances at Round 1.** Applying `opening_variants.initial_stances` into `state["stances"]` ensures proposals and votes are meaningful from the first issue onward.
+
+---
+
+## Sprint 21 — Environment Mode Contract (LLM Provider)
+- Added `MERCURY_ENV` (`test | dev | prod`) as the authoritative environment mode in `backend/config.py`.
+- Provider resolution forces `FakeLLM` when `MERCURY_ENV=test`, regardless of other provider env vars. See `backend/llm_provider.py`.
+- `MERCURY_ENV` is read once from settings and stored on `app.state` for reuse.
+- OpenAI network calls are hard-blocked in test mode with a fast-fail guard in `OpenAIProvider.generate`. See `backend/llm_provider.py`.
+- Pytest runs set `MERCURY_ENV=test` and skip loading runtime dotenv files; settings ignore env_file when in test mode. See `tests/conftest.py` and `backend/config.py`.
+- Test DB config is explicit: export `SUPABASE_DATABASE_URL` or provide a dedicated test env file via `MERCURY_ENV_FILE`/`ENV_FILE` (e.g., `apps/api/.env.test`). Runtime dotenv files are never auto-loaded in tests.
+- OpenAI integration tests are opt-in via `RUN_OPENAI_INTEGRATION_TESTS=1` and require `MERCURY_ENV=dev` (or prod) plus a valid `OPENAI_API_KEY`.
