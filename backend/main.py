@@ -3,6 +3,8 @@ import json
 import random
 import uuid
 import hashlib
+import logging
+import os
 from typing import Any, Dict, List, Optional, TypedDict, cast
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -35,6 +37,8 @@ from .state import (
     speaker_order_with_constraint,
 )
 
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Mercury Game Backend")
 
@@ -453,6 +457,40 @@ def get_ai_responder() -> AIResponder:
     return app.state._default_ai_responder
 
 
+def should_use_openai_round3(settings: Any, provider_name: str, debate_round: int, speaker: str) -> bool:
+    if settings.mercury_env == "test":
+        return False
+    if provider_name != "openai":
+        return False
+    if debate_round not in (1, 2):
+        return False
+    if speaker == CHAIR:
+        return False
+    if settings.openai_round3_debate_speeches:
+        return True
+    return (settings.llm_provider or "").lower() == "openai"
+
+
+@app.on_event("startup")
+async def log_startup_llm_config() -> None:
+    settings = get_settings()
+    if settings.mercury_env != "dev":
+        return
+    provider = get_llm_provider(app.state)
+    responder = getattr(app.state, "ai_responder", None) or get_ai_responder()
+    logger.info(
+        "Startup LLM config",
+        extra={
+            "mercury_env": settings.mercury_env,
+            "llm_provider_env": os.getenv("LLM_PROVIDER"),
+            "openai_round3_debate_speeches": settings.openai_round3_debate_speeches,
+            "provider_name": getattr(provider, "provider_name", None),
+            "model_name": getattr(provider, "model_name", None),
+            "responder_class": responder.__class__.__name__,
+        },
+    )
+
+
 def _stable_int(seed: int, salt: str) -> int:
     digest = hashlib.sha256(f"{seed}:{salt}".encode("utf-8")).hexdigest()
     return int(digest, 16) % (2**63)
@@ -701,11 +739,24 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
                     openai_provider = get_llm_provider(app.state)
                     openai_provider_name = getattr(openai_provider, "provider_name", "fake")
                     openai_model_name = getattr(openai_provider, "model_name", None)
+                    use_openai_r3 = should_use_openai_round3(settings, openai_provider_name, debate_round, speaker)
+                    if settings.mercury_env == "dev":
+                        logger.info(
+                            "Round3 debate provider selection (preflight)",
+                            extra={
+                                "status": current_status,
+                                "debate_round": debate_round,
+                                "speaker": speaker,
+                                "provider_name": openai_provider_name,
+                                "model_name": openai_model_name,
+                                "use_openai": use_openai_r3,
+                                "openai_round3_debate_speeches": settings.openai_round3_debate_speeches,
+                                "llm_provider_env": os.getenv("LLM_PROVIDER"),
+                            },
+                        )
                     if (
-                        settings.openai_round3_debate_speeches
-                        and debate_round in (1, 2)
+                        use_openai_r3
                         and not is_human
-                        and speaker != CHAIR
                         and openai_provider_name == "openai"
                     ):
                         speech_number = 1 if debate_round == 1 else 2
@@ -1578,12 +1629,27 @@ async def advance_game(game_id: uuid.UUID, req: AdvanceRequest, session: AsyncSe
             )
             prompt = prompt_payload["prompt_text"]
             trace_request_payload = prompt_payload["request_payload"]
-            # Round 3 OpenAI is opt-in and limited to Speech 1 for non-chair roles.
             settings = get_settings()
-            use_openai_r3 = bool(settings.openai_round3_debate_speeches) and debate_round in (1, 2) and speaker != CHAIR
             provider = get_llm_provider(app.state)
             provider_name = getattr(provider, "provider_name", "fake")
             model_name = getattr(provider, "model_name", None)
+            use_openai_r3 = should_use_openai_round3(settings, provider_name, debate_round, speaker)
+            if settings.mercury_env == "dev":
+                responder = get_ai_responder() if not use_openai_r3 else None
+                logger.info(
+                    "Round3 debate provider selection",
+                    extra={
+                        "status": current_status,
+                        "debate_round": debate_round,
+                        "speaker": speaker,
+                        "provider_name": provider_name,
+                        "model_name": model_name,
+                        "use_openai": use_openai_r3,
+                        "openai_round3_debate_speeches": settings.openai_round3_debate_speeches,
+                        "llm_provider_env": os.getenv("LLM_PROVIDER"),
+                        "responder_class": responder.__class__.__name__ if responder else "OpenAIProvider",
+                    },
+                )
             if use_openai_r3 and provider_name == "openai":
                 llm_request: LLMRequest = {
                     "game_id": str(game_id),

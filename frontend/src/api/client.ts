@@ -4,9 +4,11 @@ export type AdvanceEvent =
   | "ROLE_CONFIRMED"
   | "ROUND_1_READY"
   | "ROUND_1_STEP"
+  | "HUMAN_OPENING_STATEMENT"
   | "ROUND_2_READY"
   | "CONVO_1_SELECTED"
   | "CONVO_1_MESSAGE"
+  | "CONVO_END_EARLY"
   | "CONVO_2_SELECTED"
   | "CONVO_2_MESSAGE"
   | "CONVO_2_SKIPPED"
@@ -14,8 +16,10 @@ export type AdvanceEvent =
   | "ROUND_3_START_ISSUE"
   | "ISSUE_INTRO_CONTINUE"
   | "ISSUE_DEBATE_STEP"
+  | "HUMAN_DEBATE_MESSAGE"
   | "HUMAN_VOTE"
-  | "ISSUE_RESOLUTION_CONTINUE";
+  | "ISSUE_RESOLUTION_CONTINUE"
+  | "CONTINUE";
 
 export interface ApiClientConfig {
   baseUrl?: string;
