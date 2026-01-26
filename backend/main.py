@@ -5,6 +5,7 @@ import uuid
 import hashlib
 import logging
 import os
+from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, TypedDict, cast
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -40,7 +41,28 @@ from .state import (
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Mercury Game Backend")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = get_settings()
+    if settings.mercury_env == "dev":
+        provider = get_llm_provider(app.state)
+        responder = getattr(app.state, "ai_responder", None) or get_ai_responder()
+        logger.info(
+            "Startup LLM config",
+            extra={
+                "mercury_env": settings.mercury_env,
+                "llm_provider_env": os.getenv("LLM_PROVIDER"),
+                "openai_round3_debate_speeches": settings.openai_round3_debate_speeches,
+                "provider_name": getattr(provider, "provider_name", None),
+                "model_name": getattr(provider, "model_name", None),
+                "responder_class": responder.__class__.__name__,
+            },
+        )
+    yield
+
+
+app = FastAPI(title="Mercury Game Backend", lifespan=lifespan)
 
 
 class _RequiredLLMRequest(TypedDict):
@@ -459,36 +481,24 @@ def get_ai_responder() -> AIResponder:
 
 def should_use_openai_round3(settings: Any, provider_name: str, debate_round: int, speaker: str) -> bool:
     if settings.mercury_env == "test":
-        return False
+        if not settings.openai_round3_debate_speeches:
+            return False
+        if provider_name != "openai":
+            return False
+        if debate_round not in (1, 2):
+            return False
+        if speaker == CHAIR:
+            return False
+        return True
     if provider_name != "openai":
         return False
     if debate_round not in (1, 2):
         return False
     if speaker == CHAIR:
         return False
-    if settings.openai_round3_debate_speeches:
-        return True
-    return (settings.llm_provider or "").lower() == "openai"
+    return True
 
 
-@app.on_event("startup")
-async def log_startup_llm_config() -> None:
-    settings = get_settings()
-    if settings.mercury_env != "dev":
-        return
-    provider = get_llm_provider(app.state)
-    responder = getattr(app.state, "ai_responder", None) or get_ai_responder()
-    logger.info(
-        "Startup LLM config",
-        extra={
-            "mercury_env": settings.mercury_env,
-            "llm_provider_env": os.getenv("LLM_PROVIDER"),
-            "openai_round3_debate_speeches": settings.openai_round3_debate_speeches,
-            "provider_name": getattr(provider, "provider_name", None),
-            "model_name": getattr(provider, "model_name", None),
-            "responder_class": responder.__class__.__name__,
-        },
-    )
 
 
 def _stable_int(seed: int, salt: str) -> int:
