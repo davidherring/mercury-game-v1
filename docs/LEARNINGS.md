@@ -75,3 +75,12 @@ Template for new entries:
 - Pytest runs set `MERCURY_ENV=test` and skip loading runtime dotenv files; settings ignore env_file when in test mode. See `tests/conftest.py` and `backend/config.py`.
 - Test DB config is explicit: export `SUPABASE_DATABASE_URL` or provide a dedicated test env file via `MERCURY_ENV_FILE`/`ENV_FILE` (e.g., `apps/api/.env.test`). Runtime dotenv files are never auto-loaded in tests.
 - OpenAI integration tests are opt-in via `RUN_OPENAI_INTEGRATION_TESTS=1` and require `MERCURY_ENV=dev` (or prod) plus a valid `OPENAI_API_KEY`.
+
+
+## Sprint 22 - Test Hygiene: AsyncSession teardown warnings (intermittent)
+- Symptom: Occasional `PytestUnraisableExceptionWarning` referencing `AsyncSession.close` and “Event loop is closed” when running the full pytest suite.
+- Observation: The warning is intermittent and does not reproduce reliably when running individual tests.
+- Attempted fix: Replacing `async for session in get_session()` with explicit `agen.__anext__()` / `agen.aclose()` patterns in select tests.
+- Outcome: While the warning disappeared, this change destabilized other end-to-end tests (connection closed mid-operation).
+- Decision: Prefer a consistently green test suite over eliminating this intermittent warning.
+- Guidance: Avoid manually closing `get_session()` generators in tests unless the session lifecycle is fully isolated; premature teardown can interfere with pooled asyncpg connections.
