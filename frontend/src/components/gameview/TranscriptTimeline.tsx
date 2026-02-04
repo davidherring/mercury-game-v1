@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CHAIR } from "../../config/roles";
 
 type TranscriptEntry = {
@@ -15,6 +15,53 @@ export const TranscriptTimeline: React.FC<{
   currentTurnRole: string | null;
   confirmedRoleId?: string | null;
 }> = ({ entries, loading, errorMessage, currentTurnRole, confirmedRoleId }) => {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const hasMountedRef = useRef(false);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [showNewButton, setShowNewButton] = useState(false);
+  const lastEntryKey = entries.length > 0 ? entries[entries.length - 1]?.id || String(entries.length) : "empty";
+
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+
+    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    const nearBottom = distance < 120;
+    setIsNearBottom(nearBottom);
+    if (nearBottom) {
+      setShowNewButton(false);
+    }
+  }, [entries.length]);
+
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      node.scrollTo({ top: node.scrollHeight, behavior: "auto" });
+      return;
+    }
+
+    if (!isNearBottom) {
+      setShowNewButton(true);
+      return;
+    }
+
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [lastEntryKey, isNearBottom]);
+
+  const handleScroll = () => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    const nearBottom = distance < 120;
+    setIsNearBottom(nearBottom);
+    if (nearBottom) {
+      setShowNewButton(false);
+    }
+  };
   const groupedEntries = useMemo(() => {
     const groups: {
       roleId: string | null;
@@ -55,7 +102,7 @@ export const TranscriptTimeline: React.FC<{
       </div>
       {loading && <div>Loading transcript...</div>}
       {errorMessage && <div className="text-error">Transcript error: {errorMessage}</div>}
-      <div className="transcript-list">
+      <div className="transcript-list" ref={scrollRef} onScroll={handleScroll}>
         {entries.length === 0 ? (
           <div>{loading ? " " : "No transcript yet."}</div>
         ) : (
@@ -83,7 +130,20 @@ export const TranscriptTimeline: React.FC<{
             );
           })
         )}
+        <div ref={bottomRef} />
       </div>
+      {showNewButton && (
+        <button
+          type="button"
+          className="btn btn-secondary transcript-jump"
+          onClick={() => {
+            bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+            setShowNewButton(false);
+          }}
+        >
+          New messages ↓
+        </button>
+      )}
     </section>
   );
 };

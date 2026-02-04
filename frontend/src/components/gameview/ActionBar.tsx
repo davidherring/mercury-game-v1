@@ -6,6 +6,7 @@ export const ActionBar: React.FC<{
   disabledReason: string | null;
   loading: boolean;
   errorMessage: string | null;
+  statusText?: string | null;
   mode: "advance" | "message" | "selection" | "round3_setup";
   messageValue?: string;
   messagePlaceholder?: string;
@@ -33,6 +34,7 @@ export const ActionBar: React.FC<{
   disabledReason,
   loading,
   errorMessage,
+  statusText,
   mode,
   messageValue,
   messagePlaceholder,
@@ -57,6 +59,7 @@ export const ActionBar: React.FC<{
 }) => {
   return (
     <footer className="action-bar">
+      {statusText && <div className="action-status">{statusText}</div>}
       {mode === "message" ? (
         <div className="action-stack">
           <textarea

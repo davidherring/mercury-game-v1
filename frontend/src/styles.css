@@ -38,6 +38,12 @@ body {
   background: linear-gradient(135deg, #f8f1e6 0%, #f2e9de 45%, #fbf7f1 100%);
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 button,
 input,
 select,
@@ -146,8 +152,24 @@ textarea {
   opacity: 0.6;
 }
 
+.btn:disabled.btn-primary {
+  background: #d7b19c;
+  border-color: #d7b19c;
+}
+
+.btn:disabled.btn-secondary {
+  background: #f2ebe3;
+  border-color: #e3d6c8;
+  color: var(--color-muted);
+}
+
 .btn[data-loading="true"] {
   opacity: 0.7;
+}
+
+.btn[data-loading="true"]::after {
+  content: " •••";
+  letter-spacing: 2px;
 }
 
 .input,
@@ -275,6 +297,7 @@ textarea {
 
 .game-shell {
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -302,6 +325,7 @@ textarea {
 .game-body {
   display: flex;
   flex: 1 1 auto;
+  min-height: 0;
   gap: var(--space-lg);
   padding: var(--space-lg);
   overflow: hidden;
@@ -309,6 +333,7 @@ textarea {
 
 .game-main {
   flex: 1 1 auto;
+  min-height: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -317,6 +342,7 @@ textarea {
 .game-panel {
   width: 360px;
   min-width: 280px;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -337,6 +363,12 @@ textarea {
   padding: var(--space-md) var(--space-lg);
 }
 
+.action-status {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+  margin-bottom: var(--space-sm);
+}
+
 .action-stack {
   display: flex;
   flex-direction: column;
@@ -354,15 +386,20 @@ textarea {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  position: relative;
 }
 
 .transcript-list {
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-sm);
   background: var(--color-surface-strong);
+  position: relative;
 }
 
 .transcript-group {
@@ -436,6 +473,13 @@ textarea {
 
 .transcript-group.is-current {
   box-shadow: inset 3px 0 0 0 var(--color-accent);
+}
+
+.transcript-jump {
+  position: absolute;
+  right: var(--space-md);
+  bottom: var(--space-md);
+  box-shadow: 0 6px 16px -10px var(--color-shadow);
 }
 
 .info-list {

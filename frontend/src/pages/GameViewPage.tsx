@@ -226,6 +226,7 @@ export const GameViewPage: React.FC<{ gameId: string; confirmedRoleId: string }>
       </div>
       <ActionBar
         label={action.label}
+        statusText={action.label ? `Next: ${action.label}` : null}
         enabled={isActionEnabled}
         disabledReason={
           action.mode === "message" && !messageText.trim()
