@@ -10,9 +10,9 @@ export const OrientationHeader: React.FC<{
   nextHint?: string | null;
 }> = ({ gameId, confirmedRoleId, roundLabel, phaseLabel, issueTitle, nextLabel, nextHint }) => {
   return (
-    <header style={{ borderBottom: "1px solid #ddd", padding: "12px 16px", flex: "0 0 auto" }}>
-      <div style={{ fontSize: 18, fontWeight: 600 }}>Mercury Game</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 6, fontSize: 12 }}>
+    <header className="game-header">
+      <div className="header-title">Mercury Game</div>
+      <div className="header-meta">
         <div>Game ID: {gameId}</div>
         <div>Role: {confirmedRoleId}</div>
         <div>Round: {roundLabel}</div>
@@ -20,7 +20,7 @@ export const OrientationHeader: React.FC<{
         {issueTitle && <div>Issue: {issueTitle}</div>}
         <div>
           Next: {nextLabel}
-          {nextHint ? <span style={{ color: "#666" }}> — {nextHint}</span> : null}
+          {nextHint ? <span className="text-muted"> — {nextHint}</span> : null}
         </div>
       </div>
     </header>

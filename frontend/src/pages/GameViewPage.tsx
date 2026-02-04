@@ -195,7 +195,7 @@ export const GameViewPage: React.FC<{ gameId: string; confirmedRoleId: string }>
           : action.enabled;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div className="game-shell">
       <OrientationHeader
         gameId={gameId}
         confirmedRoleId={confirmedRoleId}
@@ -205,8 +205,8 @@ export const GameViewPage: React.FC<{ gameId: string; confirmedRoleId: string }>
         nextLabel={nextInfo.label}
         nextHint={nextInfo.hint}
       />
-      <div style={{ display: "flex", flex: "1 1 auto", overflow: "hidden" }}>
-        <div style={{ flex: 1, padding: 16, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div className="game-body">
+        <div className="game-main">
           <TranscriptTimeline
             entries={transcript}
             loading={loadingTranscript}
@@ -214,8 +214,10 @@ export const GameViewPage: React.FC<{ gameId: string; confirmedRoleId: string }>
             currentTurnRole={currentTurnRole}
           />
         </div>
-        <div style={{ width: 360, padding: 16, borderLeft: "1px solid #ddd", overflowY: "auto" }}>
-          <ContextPanel gameState={gameState} loading={loadingState} errorMessage={stateError} />
+        <div className="game-panel">
+          <div className="card panel-card">
+            <ContextPanel gameState={gameState} loading={loadingState} errorMessage={stateError} />
+          </div>
         </div>
       </div>
       <ActionBar
@@ -270,13 +272,13 @@ export const GameViewPage: React.FC<{ gameId: string; confirmedRoleId: string }>
         primaryLabelOverride={action.mode === "round3_setup" ? action.round3?.buttonLabel : undefined}
         extraContent={
           action.mode === "round3_setup" ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <label>
+            <div className="action-stack">
+              <label className="field">
                 Next issue
                 <select
                   value={selectedIssueId}
                   onChange={(e) => setSelectedIssueId(e.target.value)}
-                  style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+                  className="select"
                 >
                   <option value="">-- choose --</option>
                   {(action.round3?.issues || []).map((issueId) => (
@@ -286,12 +288,12 @@ export const GameViewPage: React.FC<{ gameId: string; confirmedRoleId: string }>
                   ))}
                 </select>
               </label>
-              <label>
+              <label className="field">
                 Human placement
                 <select
                   value={humanPlacement}
                   onChange={(e) => setHumanPlacement(e.target.value as "first" | "random" | "skip")}
-                  style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+                  className="select"
                 >
                   <option value="first">first</option>
                   <option value="random">random</option>

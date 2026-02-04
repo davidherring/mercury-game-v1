@@ -40,16 +40,18 @@ export const ContextPanel: React.FC<{
 
   return (
     <section>
-      <h2 style={{ marginTop: 0 }}>Context</h2>
+      <div className="section-header">
+        <h2 className="section-title">Context</h2>
+      </div>
       {loading && <div>Loading state...</div>}
-      {errorMessage && <div style={{ color: "#b00" }}>State error: {errorMessage}</div>}
+      {errorMessage && <div className="text-error">State error: {errorMessage}</div>}
       {rows.length === 0 ? (
         <div>Context will render here when available.</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="action-stack">
           {rows.map((row) => (
             <div key={row.label}>
-              <div style={{ fontSize: 12, color: "#555" }}>{row.label}</div>
+              <div className="text-small text-muted">{row.label}</div>
               <div>{row.value}</div>
             </div>
           ))}

@@ -56,22 +56,23 @@ export const ActionBar: React.FC<{
   extraContent,
 }) => {
   return (
-    <footer style={{ borderTop: "1px solid #ddd", padding: "12px 16px", flex: "0 0 auto" }}>
+    <footer className="action-bar">
       {mode === "message" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="action-stack">
           <textarea
             value={messageValue}
             onChange={(e) => onMessageChange?.(e.target.value)}
             rows={3}
             placeholder={messagePlaceholder}
-            style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+            className="textarea"
           />
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="action-row">
             <button
               type="button"
               onClick={onAction}
               disabled={!enabled || loading}
-              style={{ padding: "8px 12px" }}
+              className="btn btn-primary"
+              data-loading={loading}
             >
               {loading ? "Submitting..." : label}
             </button>
@@ -80,26 +81,27 @@ export const ActionBar: React.FC<{
                 type="button"
                 onClick={onSecondaryAction}
                 disabled={secondaryDisabled || loading}
-                style={{ padding: "8px 12px" }}
+                className="btn btn-secondary"
+                data-loading={loading}
               >
                 {secondaryLabel}
               </button>
             )}
             {!enabled && disabledReason && (
-              <div style={{ fontSize: 12, color: "#555" }}>{disabledReason}</div>
+              <div className="text-small text-muted">{disabledReason}</div>
             )}
           </div>
         </div>
       ) : mode === "selection" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {selectionHeader && <div style={{ fontSize: 12, color: "#555" }}>{selectionHeader}</div>}
-          <label>
+        <div className="action-stack">
+          {selectionHeader && <div className="text-small text-muted">{selectionHeader}</div>}
+          <label className="field">
             {selectionLabel || "Partner"}
             <select
               value={selectionValue || ""}
               onChange={(e) => onSelectionChange?.(e.target.value)}
               disabled={allowSkip && skipChecked}
-              style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4, marginTop: 4 }}
+              className="select"
             >
               <option value="">-- choose --</option>
               {(selectionOptions || []).map((opt) => (
@@ -110,24 +112,25 @@ export const ActionBar: React.FC<{
             </select>
           </label>
           {allowSkip && (
-            <label style={{ fontSize: 12, color: "#555" }}>
+            <label className="text-small text-muted">
               <input
                 type="checkbox"
                 checked={skipChecked}
                 onChange={(e) => onSkipChange?.(e.target.checked)}
-                style={{ marginRight: 6 }}
+                className="checkbox"
               />
               {skipLabel || "Skip second conversation"}
             </label>
           )}
           {extraContent}
-          {selectionNote && <div style={{ fontSize: 12, color: "#666" }}>{selectionNote}</div>}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {selectionNote && <div className="text-small text-muted">{selectionNote}</div>}
+          <div className="action-row">
             <button
               type="button"
               onClick={onAction}
               disabled={!enabled || loading}
-              style={{ padding: "8px 12px" }}
+              className="btn btn-primary"
+              data-loading={loading}
             >
               {loading ? "Submitting..." : primaryLabelOverride || label}
             </button>
@@ -136,41 +139,44 @@ export const ActionBar: React.FC<{
                 type="button"
                 onClick={onSecondaryAction}
                 disabled={secondaryDisabled || loading}
-                style={{ padding: "8px 12px" }}
+                className="btn btn-secondary"
+                data-loading={loading}
               >
                 {secondaryLabel}
               </button>
             )}
             {!enabled && disabledReason && (
-              <div style={{ fontSize: 12, color: "#555" }}>{disabledReason}</div>
+              <div className="text-small text-muted">{disabledReason}</div>
             )}
           </div>
         </div>
       ) : mode === "round3_setup" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {selectionHeader && <div style={{ fontSize: 12, color: "#555" }}>{selectionHeader}</div>}
+        <div className="action-stack">
+          {selectionHeader && <div className="text-small text-muted">{selectionHeader}</div>}
           {extraContent}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="action-row">
             <button
               type="button"
               onClick={onAction}
               disabled={!enabled || loading}
-              style={{ padding: "8px 12px" }}
+              className="btn btn-primary"
+              data-loading={loading}
             >
               {loading ? "Submitting..." : primaryLabelOverride || label}
             </button>
             {!enabled && disabledReason && (
-              <div style={{ fontSize: 12, color: "#555" }}>{disabledReason}</div>
+              <div className="text-small text-muted">{disabledReason}</div>
             )}
           </div>
         </div>
       ) : (
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="action-row">
           <button
             type="button"
             onClick={onAction}
             disabled={!enabled || loading}
-            style={{ padding: "8px 12px" }}
+            className="btn btn-primary"
+            data-loading={loading}
           >
             {loading ? "Advancing..." : label}
           </button>
@@ -179,19 +185,20 @@ export const ActionBar: React.FC<{
               type="button"
               onClick={onSecondaryAction}
               disabled={secondaryDisabled || loading}
-              style={{ padding: "8px 12px" }}
+              className="btn btn-secondary"
+              data-loading={loading}
             >
               {secondaryLabel}
             </button>
           )}
           {!enabled && disabledReason && (
-            <div style={{ fontSize: 12, color: "#555" }}>{disabledReason}</div>
+            <div className="text-small text-muted">{disabledReason}</div>
           )}
         </div>
       )}
-      {helperText && <div style={{ marginTop: 6, fontSize: 12, color: "#555" }}>{helperText}</div>}
+      {helperText && <div className="text-small text-muted stack-sm">{helperText}</div>}
       {errorMessage && (
-        <div style={{ marginTop: 6, fontSize: 12, color: "#b00" }}>{errorMessage}</div>
+        <div className="text-small text-error stack-sm">{errorMessage}</div>
       )}
     </footer>
   );
