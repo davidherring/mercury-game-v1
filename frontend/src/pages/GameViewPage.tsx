@@ -212,6 +212,7 @@ export const GameViewPage: React.FC<{ gameId: string; confirmedRoleId: string }>
             loading={loadingTranscript}
             errorMessage={transcriptError}
             currentTurnRole={currentTurnRole}
+            confirmedRoleId={confirmedRoleId}
           />
         </div>
         <div className="game-panel">
