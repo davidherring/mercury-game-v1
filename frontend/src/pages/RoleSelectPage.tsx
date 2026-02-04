@@ -21,6 +21,21 @@ export const RoleSelectPage: React.FC = () => {
 
   const countryList = useMemo(() => [...COUNTRIES], []);
   const ngoList = useMemo(() => [...NGOS], []);
+  const roleDescriptions: Record<RoleId, string> = useMemo(
+    () => ({
+      BRA: "Votes on issues and negotiates across rounds.",
+      CAN: "Votes on issues and negotiates across rounds.",
+      CHN: "Votes on issues and negotiates across rounds.",
+      EU: "Votes on issues and negotiates across rounds.",
+      TZA: "Votes on issues and negotiates across rounds.",
+      USA: "Votes on issues and negotiates across rounds.",
+      AMAP: "Advisory voice; no vote in resolutions.",
+      MFF: "Advisory voice; no vote in resolutions.",
+      WCPA: "Advisory voice; no vote in resolutions.",
+      JPN: "Procedural chair; moderates flow without voting.",
+    }),
+    []
+  );
 
   const handleStartNewGame = async () => {
     if (!selectedRoleId || selectedRoleId === CHAIR) return;
@@ -53,24 +68,30 @@ export const RoleSelectPage: React.FC = () => {
     <main className="page">
       <div className="container">
         <h1 className="page-title">Role Selection</h1>
+        <p className="page-subtitle">
+          Select a role to start or join a session.
+        </p>
 
         <section className="section card">
           <div className="section-header">
             <h2 className="section-title">Countries</h2>
             <span className="badge">Vote required</span>
           </div>
-          <div className="choice-grid">
+          <div className="role-grid">
             {countryList.map((roleId) => (
-              <label key={roleId} className="choice">
-                <input
-                  type="radio"
-                  name="role"
-                  value={roleId}
-                  checked={selectedRoleId === roleId}
-                  onChange={() => setSelectedRoleId(roleId)}
-                />
-                <span>{roleId}</span>
-              </label>
+              <button
+                key={roleId}
+                type="button"
+                className={`role-card ${selectedRoleId === roleId ? "is-selected" : ""}`}
+                onClick={() => setSelectedRoleId(roleId)}
+                aria-pressed={selectedRoleId === roleId}
+              >
+                <div className="role-card-top">
+                  <div className="role-name">{roleId}</div>
+                  <span className="badge badge-muted">Country</span>
+                </div>
+                <div className="role-desc">{roleDescriptions[roleId]}</div>
+              </button>
             ))}
           </div>
         </section>
@@ -80,18 +101,21 @@ export const RoleSelectPage: React.FC = () => {
             <h2 className="section-title">NGOs</h2>
             <span className="badge">Observer</span>
           </div>
-          <div className="choice-grid">
+          <div className="role-grid">
             {ngoList.map((roleId) => (
-              <label key={roleId} className="choice">
-                <input
-                  type="radio"
-                  name="role"
-                  value={roleId}
-                  checked={selectedRoleId === roleId}
-                  onChange={() => setSelectedRoleId(roleId)}
-                />
-                <span>{roleId}</span>
-              </label>
+              <button
+                key={roleId}
+                type="button"
+                className={`role-card ${selectedRoleId === roleId ? "is-selected" : ""}`}
+                onClick={() => setSelectedRoleId(roleId)}
+                aria-pressed={selectedRoleId === roleId}
+              >
+                <div className="role-card-top">
+                  <div className="role-name">{roleId}</div>
+                  <span className="badge badge-muted">NGO</span>
+                </div>
+                <div className="role-desc">{roleDescriptions[roleId]}</div>
+              </button>
             ))}
           </div>
         </section>
@@ -100,10 +124,13 @@ export const RoleSelectPage: React.FC = () => {
           <div className="section-header">
             <h2 className="section-title">Chair (not selectable)</h2>
           </div>
-          <label className="choice">
-            <input type="radio" name="role" value={CHAIR} disabled />
-            <span>{CHAIR}</span>
-          </label>
+          <button type="button" className="role-card" disabled>
+            <div className="role-card-top">
+              <div className="role-name">{CHAIR}</div>
+              <span className="badge badge-muted">System role</span>
+            </div>
+            <div className="role-desc">{roleDescriptions[CHAIR]}</div>
+          </button>
         </section>
 
         <section className="section card">
