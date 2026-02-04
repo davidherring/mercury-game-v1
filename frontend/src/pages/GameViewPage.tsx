@@ -216,9 +216,12 @@ export const GameViewPage: React.FC<{ gameId: string; confirmedRoleId: string }>
           />
         </div>
         <div className="game-panel">
-          <div className="card panel-card">
-            <ContextPanel gameState={gameState} loading={loadingState} errorMessage={stateError} />
-          </div>
+          <ContextPanel
+            gameState={gameState}
+            loading={loadingState}
+            errorMessage={stateError}
+            nextActionLabel={action.label}
+          />
         </div>
       </div>
       <ActionBar
