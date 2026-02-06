@@ -21,7 +21,7 @@ async def test_openai_provider_success_stub(monkeypatch: pytest.MonkeyPatch):
     metadata = resp.get("metadata")
     assert metadata is not None
     assert metadata.get("provider") == "openai"
-    assert metadata.get("model") == DEFAULT_OPENAI_MODEL
+    assert metadata.get("model") == "stub-model"
 
 
 @pytest.mark.asyncio
@@ -64,3 +64,20 @@ def test_provider_forces_fake_llm_in_test_mode(monkeypatch: pytest.MonkeyPatch) 
     provider = get_llm_provider(_AppState())
     assert isinstance(provider, FakeLLMProvider)
     assert provider.provider_name == "fake"
+
+
+def test_provider_uses_default_model_when_env_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("MERCURY_ENV", "dev")
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "not-a-real-key")
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    monkeypatch.setenv("SUPABASE_DATABASE_URL", "postgresql://test@localhost/testdb")
+    get_settings.cache_clear()
+
+    class _AppState:
+        pass
+
+    provider = get_llm_provider(_AppState())
+    assert provider.provider_name == "openai"
+    assert provider.model_name == DEFAULT_OPENAI_MODEL
