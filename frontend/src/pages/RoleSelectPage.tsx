@@ -1,12 +1,14 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createApiClient } from "../api/client";
+import { useAuth } from "../contexts/AuthContext";
 import { useConfirmedRole } from "../contexts/RoleContext";
 import { CHAIR, COUNTRIES, NGOS, RoleId } from "../config/roles";
 import { useApiBaseUrl } from "../hooks/useApiBaseUrl";
 
 export const RoleSelectPage: React.FC = () => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const { confirmedRoleId, setConfirmedRoleId } = useConfirmedRole();
   const { baseUrl } = useApiBaseUrl();
   const api = useMemo(() => createApiClient({ baseUrl }), [baseUrl]);
@@ -67,7 +69,12 @@ export const RoleSelectPage: React.FC = () => {
   return (
     <main className="page">
       <div className="container">
-        <h1 className="page-title">Role Selection</h1>
+        <div className="page-header">
+          <h1 className="page-title">Role Selection</h1>
+          <button type="button" className="btn btn-secondary" onClick={() => void signOut()}>
+            Log out
+          </button>
+        </div>
         <p className="page-subtitle">
           Select a role to start or join a session.
         </p>
