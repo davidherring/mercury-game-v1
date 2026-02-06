@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import inspect
 from typing import Any, Dict, Optional, Protocol, TypedDict
 
 from .ai import AIResponder, FakeLLM
@@ -92,7 +93,8 @@ def get_llm_provider(app_state: Any) -> LLMProvider:
     else:
         provider_choice = (settings.llm_provider or "").lower()
         if provider_choice == "openai" and settings.openai_api_key:
-            provider = OpenAIProvider(api_key=settings.openai_api_key, model=DEFAULT_OPENAI_MODEL)
+            model_name = settings.openai_model or DEFAULT_OPENAI_MODEL
+            provider = OpenAIProvider(api_key=settings.openai_api_key, model=model_name)
         else:
             responder = getattr(app_state, "ai_responder", None) or FakeLLM()
             provider = FakeLLMProvider(responder)
@@ -118,8 +120,7 @@ DEFAULT_OPENAI_MODEL = "gpt-5-nano"
 class OpenAIProvider:
     def __init__(self, api_key: str, model: str, timeout: float = 30.0, max_retries: int = 2, client: Any = None) -> None:
         self.api_key = api_key
-        # Hard-locked model for Sprint 15; ignore env-provided variants.
-        self._model_name: Optional[str] = DEFAULT_OPENAI_MODEL
+        self._model_name: str = model
         self.timeout = timeout
         self.max_retries = max_retries
         self._client = client
@@ -149,19 +150,20 @@ class OpenAIProvider:
         for attempt in range(self.max_retries + 1):
             try:
                 if callable(self._client):
-                    content = await self._client(prompt)
+                    maybe_result = self._client(prompt)
+                    content = await maybe_result if inspect.isawaitable(maybe_result) else maybe_result
                 else:
                     client = self._client or AsyncOpenAI(api_key=self.api_key, timeout=self.timeout)
                     # Use Responses API if available; fall back to chat completions if not.
                     if hasattr(client, "responses"):
                         resp = await client.responses.create(  # type: ignore[attr-defined]
-                            model=self.model_name,
+                            model=self._model_name,
                             input=prompt,
                         )
                         content = getattr(resp, "output_text", None) or ""
                     else:
                         chat = await client.chat.completions.create(  # type: ignore[attr-defined]
-                            model=self.model_name,
+                            model=self._model_name,
                             messages=[{"role": "user", "content": prompt}],
                         )
                         content = chat.choices[0].message.content if chat.choices else ""

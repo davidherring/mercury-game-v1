@@ -49,6 +49,11 @@ async def lifespan(app: FastAPI):
         provider = get_llm_provider(app.state)
         responder = getattr(app.state, "ai_responder", None) or get_ai_responder()
         logger.info(
+            "LLM provider: %s | OpenAI model: %s",
+            getattr(provider, "provider_name", None),
+            getattr(provider, "model_name", None),
+        )
+        logger.info(
             "Startup LLM config",
             extra={
                 "mercury_env": settings.mercury_env,
