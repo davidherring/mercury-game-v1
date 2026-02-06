@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, TypedDict, cast
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -69,6 +70,19 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Mercury Game Backend", lifespan=lifespan)
 
+# CORS (locked down; expand as needed for Netlify)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:4173",
+        # Add your Netlify URL here after deploy, e.g.
+        # "https://your-site.netlify.app",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class _RequiredLLMRequest(TypedDict):
     game_id: str
