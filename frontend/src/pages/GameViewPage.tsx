@@ -460,17 +460,7 @@ function deriveActionConfig(state: any, confirmedRoleId: string): ActionConfig {
   }
 
   if (status === "ROLE_SELECTION") {
-    if (!confirmedRoleId) {
-      return disabledAction(status, "No confirmed role available.");
-    }
-    return {
-      label: "Confirm role",
-      enabled: true,
-      event: "ROLE_CONFIRMED",
-      payload: { human_role_id: confirmedRoleId },
-      disabledReason: null,
-      mode: "advance",
-    };
+    return disabledAction(status, "Confirm role from the Role Selection screen.");
   }
 
   if (status === "ROUND_1_SETUP") {

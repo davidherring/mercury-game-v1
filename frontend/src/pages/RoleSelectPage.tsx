@@ -16,8 +16,10 @@ export const RoleSelectPage: React.FC = () => {
     confirmedRoleId as RoleId | null
   );
   const [gameId, setGameId] = useState("");
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const gameIdTrimmed = gameId.trim();
   const isGameIdValid = isUuid(gameIdTrimmed);
 
@@ -41,29 +43,39 @@ export const RoleSelectPage: React.FC = () => {
 
   const handleStartNewGame = async () => {
     if (!selectedRoleId || selectedRoleId === CHAIR) return;
-    setCreateError(null);
+    setStartError(null);
     setIsCreating(true);
     try {
       const result = await api.createGame();
       const newGameId = (result as any)?.game_id || (result as any)?.gameId || (result as any)?.gameID;
       if (typeof newGameId !== "string") {
-        setCreateError("Could not create game");
+        setStartError("Could not create game");
         return;
       }
+      await api.advance(newGameId, "ROLE_CONFIRMED", { human_role_id: selectedRoleId });
       setConfirmedRoleId(selectedRoleId);
       navigate(`/game/${newGameId}`);
     } catch {
-      setCreateError("Could not create game");
+      setStartError("Could not start game");
     } finally {
       setIsCreating(false);
     }
   };
 
-  const handleJoinExisting = () => {
+  const handleJoinExisting = async () => {
     if (!selectedRoleId || selectedRoleId === CHAIR) return;
     if (!isGameIdValid) return;
-    setConfirmedRoleId(selectedRoleId);
-    navigate(`/game/${gameIdTrimmed}`);
+    setJoinError(null);
+    setIsJoining(true);
+    try {
+      await api.advance(gameIdTrimmed, "ROLE_CONFIRMED", { human_role_id: selectedRoleId });
+      setConfirmedRoleId(selectedRoleId);
+      navigate(`/game/${gameIdTrimmed}`);
+    } catch {
+      setJoinError("Could not join game");
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   return (
@@ -128,19 +140,6 @@ export const RoleSelectPage: React.FC = () => {
         </section>
 
         <section className="section card">
-          <div className="section-header">
-            <h2 className="section-title">Chair (not selectable)</h2>
-          </div>
-          <button type="button" className="role-card" disabled>
-            <div className="role-card-top">
-              <div className="role-name">{CHAIR}</div>
-              <span className="badge badge-muted">System role</span>
-            </div>
-            <div className="role-desc">{roleDescriptions[CHAIR]}</div>
-          </button>
-        </section>
-
-        <section className="section card">
           <div className="action-row">
             <button
               type="button"
@@ -151,7 +150,7 @@ export const RoleSelectPage: React.FC = () => {
             >
               {isCreating ? "Starting..." : "Start New Game"}
             </button>
-            {createError && <div className="text-small text-error">{createError}</div>}
+            {startError && <div className="text-small text-error">{startError}</div>}
           </div>
         </section>
 
@@ -178,11 +177,12 @@ export const RoleSelectPage: React.FC = () => {
             <button
               type="button"
               onClick={handleJoinExisting}
-              disabled={!selectedRoleId || selectedRoleId === CHAIR || !isGameIdValid}
+              disabled={!selectedRoleId || selectedRoleId === CHAIR || !isGameIdValid || isJoining}
               className="btn btn-secondary"
             >
-              Join Existing Game
+              {isJoining ? "Joining..." : "Join Existing Game"}
             </button>
+            {joinError && <div className="text-small text-error">{joinError}</div>}
           </div>
         </section>
       </div>

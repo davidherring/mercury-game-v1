@@ -74,18 +74,29 @@ textarea {
 }
 
 .page-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
+  column-gap: var(--space-md);
+  row-gap: var(--space-sm);
+  width: 100%;
 }
 
 .page-header .page-title {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .page-header {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
 }
 
 .page-subtitle {
-  margin-top: calc(var(--space-lg) * -1);
+  margin-top: 0;
   margin-bottom: var(--space-lg);
   color: var(--color-muted);
 }
